@@ -38,13 +38,16 @@ async def list_repos(
     return [
         {
             "id": str(repo.id),
+            "name": repo.full_name.split("/")[-1] if repo.full_name else "Unknown",
             "full_name": repo.full_name,
             "html_url": repo.html_url,
             "description": repo.description,
             "language": repo.language,
             "stars": repo.stars,
             "forks": repo.forks,
+            "watchers": repo.stars,  # GitHub uses stars as watchers
             "is_fork": repo.is_fork,
+            "last_commit_at": repo.last_synced_at.isoformat() if repo.last_synced_at else None,
             "last_synced_at": repo.last_synced_at.isoformat() if repo.last_synced_at else None,
         }
         for repo in repos

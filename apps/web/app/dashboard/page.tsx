@@ -34,19 +34,38 @@ const itemVariants = {
 
 export default function DashboardPage() {
   const [summary, setSummary] = useState<any>(null);
+  const [commitData, setCommitData] = useState<any[]>([]);
+  const [languageData, setLanguageData] = useState<any[]>([]);
+  const [heatmapData, setHeatmapData] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    fetchSummary();
+    fetchAllData();
   }, []);
 
-  const fetchSummary = async () => {
+  const fetchAllData = async () => {
     try {
-      const res = await fetch("/api/dashboard/summary?range=week");
-      const data = await res.json();
-      setSummary(data);
+      // Fetch all data in parallel
+      const [summaryRes, commitRes, languageRes, heatmapRes] = await Promise.all([
+        fetch("/api/dashboard/summary?range=week"),
+        fetch("/api/charts/commit-activity?days=30"),
+        fetch("/api/charts/language-distribution"),
+        fetch("/api/charts/activity-heatmap?days=365"),
+      ]);
+
+      const [summaryData, commitData, languageData, heatmapData] = await Promise.all([
+        summaryRes.json(),
+        commitRes.json(),
+        languageRes.json(),
+        heatmapRes.json(),
+      ]);
+
+      setSummary(summaryData);
+      setCommitData(commitData.data || []);
+      setLanguageData(languageData.data || []);
+      setHeatmapData(heatmapData.data || []);
     } catch (error) {
-      console.error("Failed to fetch summary:", error);
+      console.error("Failed to fetch dashboard data:", error);
     } finally {
       setLoading(false);
     }
@@ -205,21 +224,12 @@ export default function DashboardPage() {
 
         {/* Commit Chart */}
         <motion.div variants={itemVariants}>
-          <Card className="p-6">
-            <h3 className="text-xl font-semibold text-gray-900 dark:text-white mb-6">
-              최근 30일 커밋 활동
-            </h3>
-            <CommitChart />
-          </Card>
+          <CommitChart data={commitData} />
         </motion.div>
 
         {/* Charts Row */}
         <motion.div variants={itemVariants} className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          <Card className="p-6">
-            <h3 className="text-xl font-semibold text-gray-900 dark:text-white mb-6">
-              프로그래밍 언어 분포
-            </h3>
-            <LanguageChart />
+          <LanguageChart data={languageData} />
           </Card>
 
           <Card className="p-6">
@@ -267,12 +277,7 @@ export default function DashboardPage() {
 
         {/* Activity Heatmap */}
         <motion.div variants={itemVariants}>
-          <Card className="p-6">
-            <h3 className="text-xl font-semibold text-gray-900 dark:text-white mb-6">
-              연간 활동 히트맵
-            </h3>
-            <ActivityHeatmap />
-          </Card>
+          <ActivityHeatmap data={heatmapData} />
         </motion.div>
       </motion.div>
     </div>

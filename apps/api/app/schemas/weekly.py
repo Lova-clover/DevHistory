@@ -36,18 +36,20 @@ class WeeklySummaryCreate(BaseModel):
 
 class WeeklySummaryResponse(BaseModel):
     """Weekly summary response"""
-    id: int
-    user_id: int
+    id: str  # Changed to string for UUID
+    user_id: str  # Changed to string for UUID
     start_date: date
     end_date: date
+    title: Optional[str] = None  # Added for frontend
     summary_text: str
     highlights: Optional[list[str]]
-    commit_count: int = Field(ge=0)
-    problem_count: int = Field(ge=0)
-    blog_count: int = Field(ge=0)
-    status: Literal["pending", "processing", "completed", "failed"]
+    commit_count: int = Field(ge=0, alias="commits")
+    problem_count: int = Field(ge=0, alias="problems")
+    blog_count: int = Field(ge=0, alias="notes")
+    status: Literal["pending", "processing", "completed", "failed", "draft", "published"]  # Added draft/published
     created_at: datetime
     updated_at: datetime
+    week: str  # ISO format week start for frontend
     
     class Config:
         from_attributes = True

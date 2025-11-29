@@ -1,7 +1,7 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from app.config import settings
-from app.routers import auth, me, profile, collector, dashboard, weekly, repos, generate
+from app.routers import auth, me, profile, collector, dashboard, weekly, repos, generate, charts
 
 app = FastAPI(
     title="AutoMerge API",
@@ -27,6 +27,7 @@ app.include_router(dashboard.router, prefix="/api/dashboard", tags=["dashboard"]
 app.include_router(weekly.router, prefix="/api/weekly", tags=["weekly"])
 app.include_router(repos.router, prefix="/api/repos", tags=["repos"])
 app.include_router(generate.router, prefix="/api/generate", tags=["generate"])
+app.include_router(charts.router, prefix="/api/charts", tags=["charts"])
 
 
 @app.get("/")
