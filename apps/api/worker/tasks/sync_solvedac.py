@@ -18,11 +18,13 @@ def sync_solvedac_for_user(user_id: str):
         if not profile or not profile.solvedac_handle:
             return {"error": "solved.ac handle not configured"}
         
-        # TODO: Implement actual solved.ac API calls
-        # from merge_collector.solvedac import sync_problems
-        # sync_problems(user, profile.solvedac_handle, db)
+        # Sync solved problems
+        import asyncio
+        from merge_collector.solvedac import sync_problems
         
-        return {"status": "success", "user_id": user_id}
+        problems = asyncio.run(sync_problems(str(user.id), profile.solvedac_handle, db))
+        
+        return {"status": "success", "user_id": user_id, "problems_synced": len(problems)}
     finally:
         db.close()
 

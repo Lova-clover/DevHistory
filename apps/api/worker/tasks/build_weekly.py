@@ -41,15 +41,9 @@ def build_weekly_summary(user_id: str, week_start_date: str):
         ).all()
         
         # Build aggregation
-        summary_json = {
-            "by_day": {},
-            "problems_by_tag": {},
-            "commits_by_repo": {},
-        }
+        from merge_timeline.aggregator import aggregate_week_data
         
-        # TODO: Implement actual aggregation logic
-        # from merge_timeline import aggregate_week_data
-        # summary_json = aggregate_week_data(commits, problems, notes)
+        summary_json = aggregate_week_data(commits, problems, notes)
         
         # Upsert weekly summary
         existing = db.query(WeeklySummary).filter(

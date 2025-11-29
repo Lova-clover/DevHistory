@@ -18,11 +18,13 @@ def sync_velog_for_user(user_id: str):
         if not profile or not profile.velog_id:
             return {"error": "Velog ID not configured"}
         
-        # TODO: Implement actual Velog RSS parsing
-        # from merge_collector.velog import sync_posts
-        # sync_posts(user, profile.velog_id, db)
+        # Sync blog posts
+        import asyncio
+        from merge_collector.velog import sync_blog_posts
         
-        return {"status": "success", "user_id": user_id}
+        posts = asyncio.run(sync_blog_posts(str(user.id), profile.velog_id, db))
+        
+        return {"status": "success", "user_id": user_id, "posts_synced": len(posts)}
     finally:
         db.close()
 

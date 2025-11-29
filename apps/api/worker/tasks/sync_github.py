@@ -23,12 +23,18 @@ def sync_github_for_user(user_id: str):
         if not github_account:
             return {"error": "GitHub account not connected"}
         
-        # TODO: Implement actual GitHub API calls
-        # from merge_collector.github import sync_repos, sync_commits
-        # sync_repos(user, github_account.access_token, db)
-        # sync_commits(user, github_account.access_token, db)
+        # Sync repos and commits
+        import asyncio
+        from merge_collector.github import sync_repos, sync_commits
         
-        return {"status": "success", "user_id": user_id}
+        # Sync repositories
+        repos = asyncio.run(sync_repos(str(user.id), github_account.access_token, db))
+        
+        # Sync commits for each repo
+        for repo in repos:
+            asyncio.run(sync_commits(str(user.id), repo["id"], github_account.access_token, db, since_days=30))
+        
+        return {"status": "success", "user_id": user_id, "repos_synced": len(repos)}
     finally:
         db.close()
 
