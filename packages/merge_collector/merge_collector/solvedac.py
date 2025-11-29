@@ -16,22 +16,59 @@ async def sync_problems(user_id: str, handle: str, db: Session) -> List[Dict[str
     Returns:
         List of synced problem data
     """
-    # TODO: Implement actual solved.ac API calls
+    # Get solved problems from solved.ac API
     # Note: solved.ac API documentation: https://solvedac.github.io/unofficial-documentation
     
+    from app.models.problem import Problem
+    
     async with httpx.AsyncClient() as client:
-        # Example: Get user info
-        response = await client.get(
-            f"https://solved.ac/api/v3/user/show",
-            params={"handle": handle}
-        )
-        user_info = response.json()
+        # Get user's solved problems (using search API)
+        try:
+            response = await client.get(
+                f"https://solved.ac/api/v3/search/problem",
+                params={
+                    "query": f"solved_by:{handle}",
+                    "sort": "solved",
+                    "direction": "desc",
+                    "page": 1,
+                    "limit": 100
+                }
+            )
+            search_result = response.json()
+            problems_data = search_result.get("items", [])
+        except Exception as e:
+            print(f"Error fetching solved.ac data: {e}")
+            return []
+    
+    # Upsert problems into database
+    synced_problems = []
+    for problem_data in problems_data:
+        # Check if problem exists
+        existing_problem = db.query(Problem).filter(
+            Problem.user_id == user_id,
+            Problem.problem_id == problem_data["problemId"]
+        ).first()
         
-        # TODO: Get solved problems list
-        # This might require parsing user's submission history
-        # or using other endpoints
+        if not existing_problem:
+            # Create new problem
+            tags = [tag["key"] for tag in problem_data.get("tags", [])]
+            
+            new_problem = Problem(
+                user_id=user_id,
+                problem_id=problem_data["problemId"],
+                title=problem_data.get("titleKo") or problem_data.get("title"),
+                level=problem_data.get("level"),
+                tags=tags,
+                solved_at=datetime.utcnow(),  # Note: actual solve time not available from API
+                raw_data=problem_data
+            )
+            db.add(new_problem)
+            synced_problems.append(new_problem)
     
-    # TODO: Implement database upsert logic
-    # from app.models.problem import Problem
-    
-    return []
+    db.commit()
+    return [{
+        "problem_id": problem.problem_id,
+        "title": problem.title,
+        "level": problem.level,
+        "tags": problem.tags
+    } for problem in synced_problems]
