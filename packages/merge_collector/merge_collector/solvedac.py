@@ -1,9 +1,16 @@
 """solved.ac data collection."""
 import httpx
+import logging
 from sqlalchemy.orm import Session
 from typing import List, Dict, Any
+from datetime import datetime
+from app.utils.retry import retry_with_backoff, handle_api_errors, solvedac_rate_limiter
+from app.exceptions import DataValidationError
+
+logger = logging.getLogger(__name__)
 
 
+@handle_api_errors("solved.ac")
 async def sync_problems(user_id: str, handle: str, db: Session) -> List[Dict[str, Any]]:
     """
     Sync solved.ac problems for a user.
@@ -43,6 +50,11 @@ async def sync_problems(user_id: str, handle: str, db: Session) -> List[Dict[str
     # Upsert problems into database
     synced_problems = []
     for problem_data in problems_data:
+        # Validate required fields
+        if "problemId" not in problem_data:
+            logger.warning("Skipping problem with missing problemId")
+            continue
+        
         # Check if problem exists
         existing_problem = db.query(Problem).filter(
             Problem.user_id == user_id,
@@ -66,6 +78,8 @@ async def sync_problems(user_id: str, handle: str, db: Session) -> List[Dict[str
             synced_problems.append(new_problem)
     
     db.commit()
+    logger.info(f"Successfully synced {len(synced_problems)} problems for user {handle}")
+    
     return [{
         "problem_id": problem.problem_id,
         "title": problem.title,

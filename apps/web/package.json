@@ -11,7 +11,14 @@
   "dependencies": {
     "next": "^14.2.0",
     "react": "^18.3.0",
-    "react-dom": "^18.3.0"
+    "react-dom": "^18.3.0",
+    "sonner": "^1.4.0",
+    "lucide-react": "^0.263.1",
+    "framer-motion": "^10.16.16",
+    "recharts": "^2.10.3",
+    "date-fns": "^3.0.6",
+    "react-markdown": "^9.0.1",
+    "next-themes": "^0.2.1"
   },
   "devDependencies": {
     "@types/node": "^20",

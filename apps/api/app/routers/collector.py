@@ -6,54 +6,99 @@ from app.models.user import User
 from app.models.repo import Repo
 from app.models.problem import Problem
 from app.models.blog_post import BlogPost
+from app.schemas.collector import (
+    SyncRequest, 
+    SyncStatus, 
+    CollectorConfig,
+    CollectorConfigResponse
+)
 from sqlalchemy import func
+from datetime import datetime
+from typing import Optional
 
 router = APIRouter()
 
 
-@router.post("/trigger/github")
+@router.post("/sync", response_model=SyncStatus)
+async def trigger_sync(
+    request: SyncRequest,
+    background_tasks: BackgroundTasks,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """Trigger data synchronization from specified source."""
+    task_map = {
+        "github": ("worker.tasks.sync_github", "sync_github_for_user"),
+        "solvedac": ("worker.tasks.sync_solvedac", "sync_solvedac_for_user"),
+        "velog": ("worker.tasks.sync_velog", "sync_velog_for_user")
+    }
+    
+    module_name, func_name = task_map[request.source]
+    module = __import__(module_name, fromlist=[func_name])
+    task_func = getattr(module, func_name)
+    
+    task = task_func.delay(str(current_user.id), force_full=request.force_full_sync)
+    
+    # Get last sync time
+    last_synced = None
+    if request.source == "github":
+        last_synced = db.query(func.max(Repo.updated_at)).filter(Repo.user_id == current_user.id).scalar()
+    elif request.source == "solvedac":
+        last_synced = db.query(func.max(Problem.created_at)).filter(Problem.user_id == current_user.id).scalar()
+    elif request.source == "velog":
+        last_synced = db.query(func.max(BlogPost.created_at)).filter(BlogPost.user_id == current_user.id).scalar()
+    
+    return SyncStatus(
+        source=request.source,
+        status="pending",
+        last_synced_at=last_synced,
+        items_synced=0
+    )
+
+
+@router.post("/trigger/github", deprecated=True)
 async def trigger_github_sync(
     background_tasks: BackgroundTasks,
     current_user: User = Depends(get_current_user)
 ):
-    """Trigger manual GitHub sync."""
+    """Trigger manual GitHub sync. (Deprecated: Use /sync endpoint)"""
     from worker.tasks.sync_github import sync_github_for_user
     sync_github_for_user.delay(str(current_user.id))
     
     return {"message": "GitHub sync triggered", "status": "queued"}
 
 
-@router.post("/trigger/solvedac")
+@router.post("/trigger/solvedac", deprecated=True)
 async def trigger_solvedac_sync(
     background_tasks: BackgroundTasks,
     current_user: User = Depends(get_current_user)
 ):
-    """Trigger manual solved.ac sync."""
+    """Trigger manual solved.ac sync. (Deprecated: Use /sync endpoint)"""
     from worker.tasks.sync_solvedac import sync_solvedac_for_user
     sync_solvedac_for_user.delay(str(current_user.id))
     
     return {"message": "solved.ac sync triggered", "status": "queued"}
 
 
-@router.post("/trigger/velog")
+@router.post("/trigger/velog", deprecated=True)
 async def trigger_velog_sync(
     background_tasks: BackgroundTasks,
     current_user: User = Depends(get_current_user)
 ):
-    """Trigger manual Velog sync."""
+    """Trigger manual Velog sync. (Deprecated: Use /sync endpoint)"""
     from worker.tasks.sync_velog import sync_velog_for_user
     sync_velog_for_user.delay(str(current_user.id))
     
     return {"message": "Velog sync triggered", "status": "queued"}
 
 
-@router.get("/status")
+@router.get("/status", response_model=list[SyncStatus])
 async def get_sync_status(
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
     """Get sync status for all sources."""
-    # Get last sync times from database
+    # Get last sync times and counts from database
     last_repo = db.query(Repo).filter(
         Repo.user_id == current_user.id
     ).order_by(Repo.last_synced_at.desc()).first()
@@ -66,20 +111,63 @@ async def get_sync_status(
         BlogPost.user_id == current_user.id
     ).order_by(BlogPost.created_at.desc()).first()
     
-    return {
-        "github": {
-            "status": "idle",
-            "last_synced": last_repo.last_synced_at.isoformat() if last_repo and last_repo.last_synced_at else None,
-            "total_repos": db.query(func.count(Repo.id)).filter(Repo.user_id == current_user.id).scalar()
-        },
-        "solvedac": {
-            "status": "idle",
-            "last_synced": last_problem.created_at.isoformat() if last_problem else None,
-            "total_problems": db.query(func.count(Problem.id)).filter(Problem.user_id == current_user.id).scalar()
-        },
-        "velog": {
-            "status": "idle",
-            "last_synced": last_post.created_at.isoformat() if last_post else None,
-            "total_posts": db.query(func.count(BlogPost.id)).filter(BlogPost.user_id == current_user.id).scalar()
-        },
-    }
+    github_count = db.query(func.count(Repo.id)).filter(Repo.user_id == current_user.id).scalar() or 0
+    problem_count = db.query(func.count(Problem.id)).filter(Problem.user_id == current_user.id).scalar() or 0
+    post_count = db.query(func.count(BlogPost.id)).filter(BlogPost.user_id == current_user.id).scalar() or 0
+    
+    return [
+        SyncStatus(
+            source="github",
+            status="completed" if github_count > 0 else "pending",
+            last_synced_at=last_repo.last_synced_at if last_repo and last_repo.last_synced_at else None,
+            items_synced=github_count
+        ),
+        SyncStatus(
+            source="solvedac",
+            status="completed" if problem_count > 0 else "pending",
+            last_synced_at=last_problem.created_at if last_problem else None,
+            items_synced=problem_count
+        ),
+        SyncStatus(
+            source="velog",
+            status="completed" if post_count > 0 else "pending",
+            last_synced_at=last_post.created_at if last_post else None,
+            items_synced=post_count
+        ),
+    ]
+
+
+@router.get("/config", response_model=CollectorConfigResponse)
+async def get_collector_config(
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """Get collector configuration and connection status."""
+    # Check if data exists for each source
+    has_github = db.query(Repo).filter(Repo.user_id == current_user.id).first() is not None
+    has_solvedac = db.query(Problem).filter(Problem.user_id == current_user.id).first() is not None
+    has_velog = db.query(BlogPost).filter(BlogPost.user_id == current_user.id).first() is not None
+    
+    # Get last sync times
+    last_github = None
+    last_solvedac = None
+    last_velog = None
+    
+    if has_github:
+        last_github = db.query(func.max(Repo.updated_at)).filter(Repo.user_id == current_user.id).scalar()
+    if has_solvedac:
+        last_solvedac = db.query(func.max(Problem.created_at)).filter(Problem.user_id == current_user.id).scalar()
+    if has_velog:
+        last_velog = db.query(func.max(BlogPost.created_at)).filter(BlogPost.user_id == current_user.id).scalar()
+    
+    return CollectorConfigResponse(
+        github_username=current_user.github_username,
+        github_connected=has_github,
+        solvedac_username=None,  # TODO: Store in user profile
+        solvedac_connected=has_solvedac,
+        velog_username=None,  # TODO: Store in user profile
+        velog_connected=has_velog,
+        last_github_sync=last_github,
+        last_solvedac_sync=last_solvedac,
+        last_velog_sync=last_velog
+    )
