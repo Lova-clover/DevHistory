@@ -35,6 +35,7 @@ async def sync_repos(user_id: str, access_token: str, db: Session) -> List[Dict[
                     "Accept": "application/vnd.github.v3+json",
                 },
                 params={
+                    "affiliation": "owner",  # Only repos owned by the user
                     "sort": "updated",
                     "per_page": 100,
                 }
