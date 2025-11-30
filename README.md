@@ -371,6 +371,12 @@ docker exec -it devhistory_api alembic upgrade head
 
 ---
 
+## 📘 More Details
+DevHistory를 어떻게 설계 및 개발했는지, 구현 과정과 회고는 아래 블로그에서 자세히 정리했습니다.
+- [DevHistory – 개발 포트폴리오 자동화 플랫폼 만들기 (Velog)](https://velog.io/@lova-clover/DevHistory-개발-포트폴리오-자동화-플랫폼-만들기)
+
+---
+
 ## 📄 License
 
 MIT License
