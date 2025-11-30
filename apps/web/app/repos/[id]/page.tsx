@@ -14,6 +14,7 @@ export default function RepoDetailPage() {
     if (params.id) {
       fetchRepo();
     }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [params.id]);
 
   const fetchRepo = async () => {

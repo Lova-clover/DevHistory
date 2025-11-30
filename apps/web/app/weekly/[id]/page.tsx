@@ -13,6 +13,7 @@ export default function WeeklyDetailPage() {
     if (params.id) {
       fetchWeekly();
     }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [params.id]);
 
   const fetchWeekly = async () => {

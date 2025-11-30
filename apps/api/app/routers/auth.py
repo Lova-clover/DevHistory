@@ -54,12 +54,39 @@ async def github_callback(code: str, db: Session = Depends(get_db)):
             },
         )
         github_user = user_response.json()
+        
+        # Get user emails from GitHub (separate API call)
+        emails_response = await client.get(
+            "https://api.github.com/user/emails",
+            headers={
+                "Authorization": f"Bearer {access_token}",
+                "Accept": "application/json",
+            },
+        )
+        emails = emails_response.json()
+        
+        # Find primary email or first verified email
+        email = github_user.get("email")
+        if not email and isinstance(emails, list):
+            for email_data in emails:
+                if email_data.get("primary") and email_data.get("verified"):
+                    email = email_data.get("email")
+                    break
+            if not email:
+                for email_data in emails:
+                    if email_data.get("verified"):
+                        email = email_data.get("email")
+                        break
+        
+        # Use login as fallback for email (GitHub username)
+        if not email:
+            email = f"{github_user['login']}@users.noreply.github.com"
     
     # Find or create user
-    user = db.query(User).filter(User.email == github_user["email"]).first()
+    user = db.query(User).filter(User.email == email).first()
     if not user:
         user = User(
-            email=github_user["email"],
+            email=email,
             name=github_user.get("name") or github_user["login"],
             avatar_url=github_user.get("avatar_url"),
         )
@@ -95,15 +122,8 @@ async def github_callback(code: str, db: Session = Depends(get_db)):
     }
     jwt_token = jwt.encode(jwt_payload, settings.JWT_SECRET, algorithm=settings.JWT_ALGORITHM)
     
-    # Set cookie and redirect to frontend
-    response = RedirectResponse(url=f"{settings.FRONTEND_URL}/dashboard")
-    response.set_cookie(
-        key="access_token",
-        value=jwt_token,
-        httponly=True,
-        max_age=settings.JWT_EXPIRE_DAYS * 24 * 60 * 60,
-        samesite="lax",
-    )
+    # Redirect to frontend with token in URL (will be saved to localStorage)
+    response = RedirectResponse(url=f"{settings.FRONTEND_URL}/auth/callback?token={jwt_token}")
     
     return response
 

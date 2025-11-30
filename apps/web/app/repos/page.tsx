@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { EmptyState } from "@/components/ui/empty-state";
 import { Loading } from "@/components/ui/loading";
+import { fetchWithAuth } from "@/lib/api";
 import { format } from "date-fns";
 import { ko } from "date-fns/locale";
 
@@ -58,11 +59,12 @@ export default function ReposPage() {
 
   useEffect(() => {
     filterRepos();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [searchQuery, selectedLanguage, repos]);
 
   const fetchRepos = async () => {
     try {
-      const res = await fetch("/api/repos");
+      const res = await fetchWithAuth("/api/repos");
       const data = await res.json();
       // Ensure data is an array
       const reposArray = Array.isArray(data) ? data : [];
@@ -80,7 +82,7 @@ export default function ReposPage() {
   const triggerSync = async () => {
     setSyncing(true);
     try {
-      await fetch("/api/collector/trigger/github", { method: "POST" });
+      await fetchWithAuth("/api/collector/trigger/github", { method: "POST" });
       alert("GitHub 동기화를 시작했습니다");
       fetchRepos();
     } catch (error) {
@@ -153,8 +155,10 @@ export default function ReposPage() {
           <EmptyState
             title="레포지토리가 없습니다"
             description="GitHub에서 레포지토리를 동기화해보세요"
-            actionLabel="지금 동기화"
-            onAction={triggerSync}
+            action={{
+              label: "지금 동기화",
+              onClick: triggerSync
+            }}
           />
         ) : (
           <>

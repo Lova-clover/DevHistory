@@ -24,9 +24,11 @@ export default function RootLayout({
           <ToastProvider>
             <nav className="sticky top-0 z-40 border-b bg-white/80 dark:bg-gray-900/80 backdrop-blur-md shadow-sm">
               <div className="container mx-auto px-4 py-3 flex items-center justify-between">
-                <h1 className="text-2xl font-bold bg-gradient-to-r from-primary-600 to-primary-400 bg-clip-text text-transparent">
-                  DevHistory
-                </h1>
+                <a href="/">
+                  <h1 className="text-2xl font-bold bg-gradient-to-r from-primary-600 to-primary-400 bg-clip-text text-transparent cursor-pointer hover:opacity-80 transition-opacity">
+                    DevHistory
+                  </h1>
+                </a>
                 <div className="flex items-center gap-6">
                   <a href="/dashboard" className="text-gray-700 dark:text-gray-300 hover:text-primary-600 dark:hover:text-primary-400 transition-colors font-medium">
                     대시보드

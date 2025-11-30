@@ -45,6 +45,7 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
         hideToast(id);
       }, duration);
     }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const hideToast = useCallback((id: string) => {

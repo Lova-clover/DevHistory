@@ -1,3 +1,7 @@
+import sys
+sys.path.insert(0, '/app/packages/merge_timeline')
+sys.path.insert(0, '/app/packages/merge_core')
+
 from datetime import datetime, timedelta, date
 from worker.celery_app import celery_app
 from app.database import SessionLocal

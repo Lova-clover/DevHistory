@@ -136,8 +136,10 @@ export default function WeeklyPage() {
           <EmptyState
             title="주간 리포트가 없습니다"
             description="첫 번째 주간 리포트를 생성해보세요"
-            actionLabel="리포트 생성"
-            onAction={handleCreateReport}
+            action={{
+              label: "리포트 생성",
+              onClick: handleCreateReport
+            }}
           />
         ) : (
           <>

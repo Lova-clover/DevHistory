@@ -1,3 +1,10 @@
+import sys
+sys.path.insert(0, '/app/packages/merge_collector')
+sys.path.insert(0, '/app/packages/merge_core')
+sys.path.insert(0, '/app/packages/merge_forge')
+sys.path.insert(0, '/app/packages/merge_styler')
+sys.path.insert(0, '/app/packages/merge_timeline')
+
 from worker.celery_app import celery_app
 from app.database import SessionLocal
 from app.models.user import User

@@ -15,7 +15,7 @@ class GeneratedContent(Base):
     source_ref = Column(String)  # 'weekly:{id}', 'repo:{id}'
     title = Column(String)
     content = Column(Text, nullable=False)  # Markdown or plain text
-    metadata = Column(JSONB)
+    content_metadata = Column(JSONB)
     created_at = Column(DateTime(timezone=True), nullable=False, default=datetime.utcnow)
     
     # Relationships
