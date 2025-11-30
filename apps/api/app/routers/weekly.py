@@ -13,9 +13,50 @@ from app.schemas.weekly import (
     WeeklyFilterRequest
 )
 from sqlalchemy import func
-from datetime import datetime
+from datetime import datetime, timedelta
 
 router = APIRouter()
+
+
+@router.post("/generate")
+async def generate_weekly_report(
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """Generate weekly report for current week."""
+    # Get current week start (Monday)
+    today = datetime.utcnow().date()
+    days_since_monday = today.weekday()
+    week_start = today - timedelta(days=days_since_monday)
+    week_end = week_start + timedelta(days=6)
+    
+    # Check if summary already exists
+    existing = db.query(WeeklySummary).filter(
+        WeeklySummary.user_id == current_user.id,
+        WeeklySummary.week_start == week_start
+    ).first()
+    
+    if existing:
+        # Trigger LLM generation for existing summary
+        from worker.tasks.forge_llm import generate_weekly_report_llm
+        task = generate_weekly_report_llm.delay(str(current_user.id), str(existing.id))
+        
+        return {
+            "message": "Weekly report generation started",
+            "weekly_id": str(existing.id),
+            "week_start": week_start.isoformat(),
+            "week_end": week_end.isoformat()
+        }
+    
+    # Create new weekly summary first
+    from worker.tasks.build_weekly import build_weekly_summary
+    task = build_weekly_summary.delay(str(current_user.id), week_start.isoformat())
+    
+    return {
+        "message": "Building weekly summary and generating report",
+        "week_start": week_start.isoformat(),
+        "week_end": week_end.isoformat()
+    }
 
 
 @router.post("/", response_model=WeeklySummaryResponse)

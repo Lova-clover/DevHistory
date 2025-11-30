@@ -53,6 +53,81 @@ async def generate_content(
     return ContentResponse.model_validate(content)
 
 
+@router.get("/contents")
+async def get_generated_contents(
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """Get all generated contents for current user."""
+    contents = db.query(GeneratedContent).filter(
+        GeneratedContent.user_id == current_user.id
+    ).order_by(GeneratedContent.created_at.desc()).all()
+    
+    return [{
+        "id": str(content.id),
+        "type": content.type,
+        "source_ref": content.source_ref,
+        "title": content.title,
+        "content": content.content,
+        "created_at": content.created_at.isoformat()
+    } for content in contents]
+
+
+@router.put("/content/{content_id}")
+async def update_generated_content(
+    content_id: UUID,
+    update_data: dict,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """Update generated content."""
+    content = db.query(GeneratedContent).filter(
+        GeneratedContent.id == content_id,
+        GeneratedContent.user_id == current_user.id
+    ).first()
+    
+    if not content:
+        raise HTTPException(status_code=404, detail="Content not found")
+    
+    if "content" in update_data:
+        content.content = update_data["content"]
+    if "title" in update_data:
+        content.title = update_data["title"]
+    
+    db.commit()
+    db.refresh(content)
+    
+    return {
+        "id": str(content.id),
+        "type": content.type,
+        "source_ref": content.source_ref,
+        "title": content.title,
+        "content": content.content,
+        "created_at": content.created_at.isoformat()
+    }
+
+
+@router.delete("/content/{content_id}")
+async def delete_generated_content(
+    content_id: UUID,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """Delete generated content."""
+    content = db.query(GeneratedContent).filter(
+        GeneratedContent.id == content_id,
+        GeneratedContent.user_id == current_user.id
+    ).first()
+    
+    if not content:
+        raise HTTPException(status_code=404, detail="Content not found")
+    
+    db.delete(content)
+    db.commit()
+    
+    return {"message": "Content deleted successfully"}
+
+
 @router.get("/content", response_model=ContentListResponse)
 async def list_generated_content(
     filter_request: ContentFilterRequest = Depends(),
@@ -110,13 +185,13 @@ async def generate_weekly_report(
     }
 
 
-@router.post("/repo-blog/{repo_id}", deprecated=True)
+@router.post("/repo-blog/{repo_id}")
 async def generate_repo_blog(
     repo_id: UUID,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
-    """Generate blog post draft for a repository. (Deprecated: Use /content endpoint)"""
+    """Generate blog post draft for a repository."""
     repo = db.query(Repo).filter(
         Repo.id == repo_id,
         Repo.user_id == current_user.id
@@ -128,6 +203,28 @@ async def generate_repo_blog(
     # Trigger LLM generation task for repo blog
     from worker.tasks.forge_llm import generate_repo_blog_llm
     task = generate_repo_blog_llm.delay(str(current_user.id), str(repo_id))
+    
+    # Wait for task to complete (with timeout)
+    import time
+    max_wait = 30  # 30 seconds
+    start_time = time.time()
+    
+    while time.time() - start_time < max_wait:
+        if task.ready():
+            result = task.get()
+            if result.get("status") == "success":
+                # Fetch the generated content
+                content = db.query(GeneratedContent).filter(
+                    GeneratedContent.id == result.get("content_id")
+                ).first()
+                if content:
+                    return {
+                        "message": "Blog generated successfully",
+                        "content": content.content,
+                        "content_id": str(content.id)
+                    }
+            break
+        time.sleep(0.5)
     
     return {
         "message": "Repository blog generation started",

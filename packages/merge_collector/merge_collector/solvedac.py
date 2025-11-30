@@ -28,24 +28,44 @@ async def sync_problems(user_id: str, handle: str, db: Session) -> List[Dict[str
     
     from app.models.problem import Problem
     
+    # Fetch all problems with pagination
+    all_problems = []
+    page = 1
+    
     async with httpx.AsyncClient() as client:
-        # Get user's solved problems (using search API)
-        try:
-            response = await client.get(
-                f"https://solved.ac/api/v3/search/problem",
-                params={
-                    "query": f"solved_by:{handle}",
-                    "sort": "solved",
-                    "direction": "desc",
-                    "page": 1,
-                    "limit": 100
-                }
-            )
-            search_result = response.json()
-            problems_data = search_result.get("items", [])
-        except Exception as e:
-            print(f"Error fetching solved.ac data: {e}")
-            return []
+        while True:
+            # Get user's solved problems (using search API)
+            try:
+                response = await client.get(
+                    f"https://solved.ac/api/v3/search/problem",
+                    params={
+                        "query": f"solved_by:{handle}",
+                        "sort": "solved",
+                        "direction": "desc",
+                        "page": page,
+                        "limit": 100
+                    }
+                )
+                search_result = response.json()
+                items = search_result.get("items", [])
+                
+                if not items:
+                    break
+                
+                all_problems.extend(items)
+                
+                # Check if we've reached the end
+                total = search_result.get("count", 0)
+                if len(all_problems) >= total:
+                    break
+                    
+                page += 1
+                
+            except Exception as e:
+                print(f"Error fetching solved.ac data: {e}")
+                break
+    
+    problems_data = all_problems
     
     # Upsert problems into database
     synced_problems = []

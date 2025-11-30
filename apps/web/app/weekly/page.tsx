@@ -11,6 +11,7 @@ import { Tabs } from "@/components/ui/tabs";
 import { EmptyState } from "@/components/ui/empty-state";
 import { format, startOfWeek, addDays, subWeeks, addWeeks } from "date-fns";
 import { ko } from "date-fns/locale";
+import { fetchWithAuth } from "@/lib/api";
 
 interface WeeklyReport {
   id: string;
@@ -46,6 +47,7 @@ const itemVariants = {
 export default function WeeklyPage() {
   const [weeklies, setWeeklies] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [generating, setGenerating] = useState(false);
   const [currentDate, setCurrentDate] = useState(new Date());
   const [selectedReport, setSelectedReport] = useState<WeeklyReport | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -57,7 +59,7 @@ export default function WeeklyPage() {
 
   const fetchWeeklies = async () => {
     try {
-      const res = await fetch("/api/weekly");
+      const res = await fetchWithAuth("/api/weekly");
       const data = await res.json();
       // Ensure data is an array
       setWeeklies(Array.isArray(data) ? data : []);
@@ -82,8 +84,22 @@ export default function WeeklyPage() {
     setCurrentDate(addWeeks(currentDate, 1));
   };
 
-  const handleCreateReport = () => {
-    setIsModalOpen(true);
+  const handleCreateReport = async () => {
+    setGenerating(true);
+    try {
+      const res = await fetchWithAuth("/api/weekly/generate", {
+        method: "POST",
+      });
+      const data = await res.json();
+      alert("주간 리포트 생성을 시작했습니다. 잠시 후 생성된 콘텐츠 페이지에서 확인하세요.");
+      // Refresh list after generation starts
+      setTimeout(fetchWeeklies, 2000);
+    } catch (error) {
+      console.error("Failed to generate weekly report:", error);
+      alert("주간 리포트 생성에 실패했습니다");
+    } finally {
+      setGenerating(false);
+    }
   };
 
   if (loading) {
@@ -126,9 +142,9 @@ export default function WeeklyPage() {
               매주 자동으로 생성되는 개발 활동 요약
             </p>
           </div>
-          <Button onClick={handleCreateReport} size="lg">
+          <Button onClick={handleCreateReport} size="lg" disabled={generating}>
             <Plus className="w-5 h-5 mr-2" />
-            리포트 생성
+            {generating ? "생성 중..." : "리포트 생성"}
           </Button>
         </motion.div>
 
@@ -233,7 +249,11 @@ export default function WeeklyPage() {
                     {weekDays.map((day, index) => {
                       const isToday =
                         format(day, "yyyy-MM-dd") === format(new Date(), "yyyy-MM-dd");
-                      const hasActivity = Math.random() > 0.3; // Mock data
+                      // Check if there's a weekly report for this day
+                      const dayStr = format(day, "yyyy-MM-dd");
+                      const hasActivity = weeklyReports.some(report => 
+                        report.week && report.week.includes(dayStr)
+                      );
 
                       return (
                         <motion.div

@@ -87,7 +87,7 @@ async def get_dashboard_summary(
     else:  # year
         start_date = now - timedelta(days=365)
     
-    # Count commits
+    # Count commits in current period
     commit_count = db.query(func.count(Commit.id)).filter(
         Commit.user_id == current_user.id,
         Commit.committed_at >= start_date
@@ -105,13 +105,104 @@ async def get_dashboard_summary(
         Note.created_at >= start_date
     ).scalar()
     
+    # Count total repos (all time)
+    repo_count = db.query(func.count(Repo.id)).filter(
+        Repo.user_id == current_user.id
+    ).scalar()
+    
+    # Count weekly reports (all time)
+    from app.models.weekly_summary import WeeklySummary
+    weekly_report_count = db.query(func.count(WeeklySummary.id)).filter(
+        WeeklySummary.user_id == current_user.id
+    ).scalar()
+    
+    # Count total blog posts (all time)
+    blog_count = db.query(func.count(BlogPost.id)).filter(
+        BlogPost.user_id == current_user.id
+    ).scalar()
+    
+    # Count total commits (all time) for display
+    total_commits = db.query(func.count(Commit.id)).filter(
+        Commit.user_id == current_user.id
+    ).scalar()
+    
+    # Calculate streaks
+    current_streak = calculate_streak(current_user.id, db)
+    longest_streak = calculate_longest_streak(current_user.id, db)
+    
+    # Calculate previous period data for trends
+    if range == "week":
+        prev_start = start_date - timedelta(days=7)
+        prev_end = start_date
+    elif range == "month":
+        prev_start = start_date - timedelta(days=30)
+        prev_end = start_date
+    else:  # year
+        prev_start = start_date - timedelta(days=365)
+        prev_end = start_date
+    
+    prev_commit_count = db.query(func.count(Commit.id)).filter(
+        Commit.user_id == current_user.id,
+        Commit.committed_at >= prev_start,
+        Commit.committed_at < prev_end
+    ).scalar() or 0
+    
+    # Count repos created in previous period
+    prev_repo_count = db.query(func.count(Repo.id)).filter(
+        Repo.user_id == current_user.id,
+        Repo.created_at >= prev_start,
+        Repo.created_at < prev_end
+    ).scalar() or 0
+    
+    # Count repos created in current period
+    current_period_repos = db.query(func.count(Repo.id)).filter(
+        Repo.user_id == current_user.id,
+        Repo.created_at >= start_date
+    ).scalar() or 0
+    
+    # Weekly reports in this week
+    one_week_ago = now - timedelta(days=7)
+    recent_weekly_count = db.query(func.count(WeeklySummary.id)).filter(
+        WeeklySummary.user_id == current_user.id,
+        WeeklySummary.created_at >= one_week_ago
+    ).scalar() or 0
+    
+    # Count blogs in previous period
+    prev_blog_count = db.query(func.count(BlogPost.id)).filter(
+        BlogPost.user_id == current_user.id,
+        BlogPost.published_at >= prev_start,
+        BlogPost.published_at < prev_end
+    ).scalar() or 0
+    
+    # Count blogs in current period
+    current_period_blogs = db.query(func.count(BlogPost.id)).filter(
+        BlogPost.user_id == current_user.id,
+        BlogPost.published_at >= start_date
+    ).scalar() or 0
+    
+    # Calculate trends (show difference, not percentage)
+    commit_diff = commit_count - prev_commit_count
+    
+    repo_diff = current_period_repos - prev_repo_count
+    blog_diff = current_period_blogs - prev_blog_count
+    
     return {
         "range": range,
         "commit_count": commit_count or 0,
+        "total_commits": total_commits or 0,
         "problem_count": problem_count or 0,
         "note_count": note_count or 0,
+        "repo_count": repo_count or 0,
+        "weekly_report_count": weekly_report_count or 0,
+        "blog_count": blog_count or 0,
+        "current_streak": current_streak,
+        "longest_streak": longest_streak,
         "start_date": start_date.isoformat(),
         "end_date": now.isoformat(),
+        "commit_diff": commit_diff,
+        "repo_diff": repo_diff,
+        "recent_weekly_count": recent_weekly_count,
+        "blog_diff": blog_diff,
     }
 
 
@@ -196,3 +287,32 @@ def calculate_longest_streak(user_id: int, db: Session) -> int:
             current = 1
     
     return longest
+
+
+@router.get("/recent-activity")
+async def get_recent_activity(
+    limit: int = Query(10, ge=1, le=50),
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """Get recent activity for the current user - commits only."""
+    activities = []
+    
+    # Get recent commits (use committed_at for sorting)
+    recent_commits = db.query(Commit).filter(
+        Commit.user_id == current_user.id
+    ).order_by(Commit.committed_at.desc()).limit(limit).all()
+    
+    for commit in recent_commits:
+        repo = db.query(Repo).filter(Repo.id == commit.repo_id).first()
+        if commit.committed_at:  # Only add if committed_at exists
+            activities.append({
+                "type": "commit",
+                "title": f"{repo.full_name if repo else 'Unknown'}: {commit.message[:50]}{'...' if len(commit.message) > 50 else ''}",
+                "timestamp": commit.committed_at.isoformat(),
+                "color": "blue"
+            })
+    
+    # Sort by timestamp (already sorted but just to be sure)
+    activities.sort(key=lambda x: x["timestamp"], reverse=True)
+    return activities[:limit]

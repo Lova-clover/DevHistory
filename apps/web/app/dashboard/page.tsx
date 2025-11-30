@@ -9,6 +9,7 @@ import { Badge } from "@/components/ui/badge";
 import { CommitChart } from "@/components/charts/commit-chart";
 import { LanguageChart } from "@/components/charts/language-chart";
 import { ActivityHeatmap } from "@/components/charts/activity-heatmap";
+import { fetchWithAuth } from "@/lib/api";
 
 const containerVariants = {
   hidden: { opacity: 0 },
@@ -34,9 +35,11 @@ const itemVariants = {
 
 export default function DashboardPage() {
   const [summary, setSummary] = useState<any>(null);
+  const [weeklyTrend, setWeeklyTrend] = useState<any>(null);
   const [commitData, setCommitData] = useState<any[]>([]);
   const [languageData, setLanguageData] = useState<any[]>([]);
   const [heatmapData, setHeatmapData] = useState<any[]>([]);
+  const [recentActivity, setRecentActivity] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -45,25 +48,31 @@ export default function DashboardPage() {
 
   const fetchAllData = async () => {
     try {
-      // Fetch all data in parallel
-      const [summaryRes, commitRes, languageRes, heatmapRes] = await Promise.all([
-        fetch("/api/dashboard/summary?range=week"),
-        fetch("/api/charts/commit-activity?days=30"),
-        fetch("/api/charts/language-distribution"),
-        fetch("/api/charts/activity-heatmap?days=365"),
+      // Fetch all data in parallel - use 'year' for totals, 'week' for trends
+      const [summaryRes, trendRes, commitRes, languageRes, heatmapRes, activityRes] = await Promise.all([
+        fetchWithAuth("/api/dashboard/summary?range=year"),
+        fetchWithAuth("/api/dashboard/summary?range=week"),
+        fetchWithAuth("/api/charts/commit-activity?days=30"),
+        fetchWithAuth("/api/charts/language-distribution"),
+        fetchWithAuth("/api/charts/activity-heatmap?days=365"),
+        fetchWithAuth("/api/dashboard/recent-activity?limit=5"),
       ]);
 
-      const [summaryData, commitData, languageData, heatmapData] = await Promise.all([
+      const [summaryData, trendData, commitData, languageData, heatmapData, activityData] = await Promise.all([
         summaryRes.json(),
+        trendRes.json(),
         commitRes.json(),
         languageRes.json(),
         heatmapRes.json(),
+        activityRes.json(),
       ]);
 
       setSummary(summaryData);
+      setWeeklyTrend(trendData);
       setCommitData(commitData.data || []);
       setLanguageData(languageData.data || []);
       setHeatmapData(heatmapData.data || []);
+      setRecentActivity(Array.isArray(activityData) ? activityData : []);
     } catch (error) {
       console.error("Failed to fetch dashboard data:", error);
     } finally {
@@ -80,12 +89,12 @@ export default function DashboardPage() {
   }
 
   const stats = {
-    totalCommits: summary?.commit_count || 0,
-    totalRepos: 8,
-    weeklyReports: 12,
-    blogPosts: summary?.note_count || 0,
-    currentStreak: 7,
-    longestStreak: 21,
+    totalCommits: summary?.total_commits || 0,
+    totalRepos: summary?.repo_count || 0,
+    weeklyReports: summary?.weekly_report_count || 0,
+    blogPosts: summary?.blog_count || 0,
+    currentStreak: summary?.current_streak || 0,
+    longestStreak: summary?.longest_streak || 0,
   };
 
   const statCards = [
@@ -95,7 +104,7 @@ export default function DashboardPage() {
       icon: GitCommit,
       color: "text-blue-600 dark:text-blue-400",
       bgColor: "bg-blue-50 dark:bg-blue-900/20",
-      trend: "+12%",
+      trend: weeklyTrend?.commit_diff !== undefined ? `${weeklyTrend.commit_diff > 0 ? '+' : ''}${weeklyTrend.commit_diff}` : "0",
     },
     {
       title: "활성 레포지토리",
@@ -103,7 +112,7 @@ export default function DashboardPage() {
       icon: Code2,
       color: "text-purple-600 dark:text-purple-400",
       bgColor: "bg-purple-50 dark:bg-purple-900/20",
-      trend: "+3",
+      trend: weeklyTrend?.repo_diff ? `${weeklyTrend.repo_diff > 0 ? '+' : ''}${weeklyTrend.repo_diff}` : "0",
     },
     {
       title: "주간 리포트",
@@ -111,7 +120,7 @@ export default function DashboardPage() {
       icon: Calendar,
       color: "text-green-600 dark:text-green-400",
       bgColor: "bg-green-50 dark:bg-green-900/20",
-      trend: "이번 주 1개",
+      trend: weeklyTrend?.recent_weekly_count ? `이번 주 ${weeklyTrend.recent_weekly_count}개` : "이번 주 0개",
     },
     {
       title: "블로그 포스트",
@@ -119,7 +128,7 @@ export default function DashboardPage() {
       icon: BookOpen,
       color: "text-orange-600 dark:text-orange-400",
       bgColor: "bg-orange-50 dark:bg-orange-900/20",
-      trend: "+5",
+      trend: weeklyTrend?.blog_diff ? `${weeklyTrend.blog_diff > 0 ? '+' : ''}${weeklyTrend.blog_diff}` : "0",
     },
   ];
 
@@ -236,40 +245,50 @@ export default function DashboardPage() {
               최근 활동
             </h3>
             <div className="space-y-4">
-              {[
-                { title: "새로운 레포지토리 생성", time: "2시간 전", color: "blue" },
-                { title: "주간 리포트 자동 생성", time: "5시간 전", color: "green" },
-                { title: "블로그 포스트 동기화", time: "1일 전", color: "purple" },
-                { title: "GitHub 커밋 수집", time: "1일 전", color: "orange" },
-              ].map((activity, index) => (
-                <motion.div
-                  key={index}
-                  initial={{ opacity: 0, x: -20 }}
-                  animate={{ opacity: 1, x: 0 }}
-                  transition={{ delay: index * 0.1 }}
-                  className="flex items-center gap-4 p-3 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
-                >
-                  <div
-                    className={`w-2 h-2 rounded-full ${
-                      activity.color === "blue"
-                        ? "bg-blue-500"
-                        : activity.color === "green"
-                        ? "bg-green-500"
-                        : activity.color === "purple"
-                        ? "bg-purple-500"
-                        : "bg-orange-500"
-                    }`}
-                  ></div>
-                  <div className="flex-1">
-                    <p className="text-sm font-medium text-gray-900 dark:text-white">
-                      {activity.title}
-                    </p>
-                    <p className="text-xs text-gray-500 dark:text-gray-400">
-                      {activity.time}
-                    </p>
-                  </div>
-                </motion.div>
-              ))}
+              {recentActivity.length === 0 ? (
+                <p className="text-sm text-gray-500 dark:text-gray-400 text-center py-4">
+                  최근 활동이 없습니다
+                </p>
+              ) : (
+                recentActivity.map((activity, index) => {
+                  const timeAgo = new Date(activity.timestamp).toLocaleString('ko-KR', {
+                    month: 'short',
+                    day: 'numeric',
+                    hour: '2-digit',
+                    minute: '2-digit'
+                  });
+                  
+                  return (
+                    <motion.div
+                      key={index}
+                      initial={{ opacity: 0, x: -20 }}
+                      animate={{ opacity: 1, x: 0 }}
+                      transition={{ delay: index * 0.1 }}
+                      className="flex items-center gap-4 p-3 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
+                    >
+                      <div
+                        className={`w-2 h-2 rounded-full ${
+                          activity.color === "blue"
+                            ? "bg-blue-500"
+                            : activity.color === "green"
+                            ? "bg-green-500"
+                            : activity.color === "purple"
+                            ? "bg-purple-500"
+                            : "bg-orange-500"
+                        }`}
+                      ></div>
+                      <div className="flex-1">
+                        <p className="text-sm font-medium text-gray-900 dark:text-white">
+                          {activity.title}
+                        </p>
+                        <p className="text-xs text-gray-500 dark:text-gray-400">
+                          {timeAgo}
+                        </p>
+                      </div>
+                    </motion.div>
+                  );
+                })
+              )}
             </div>
           </Card>
         </motion.div>

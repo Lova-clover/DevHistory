@@ -39,8 +39,14 @@ export default function RootLayout({
                   <a href="/repos" className="text-gray-700 dark:text-gray-300 hover:text-primary-600 dark:hover:text-primary-400 transition-colors font-medium">
                     레포지토리
                   </a>
+                  <a href="/contents" className="text-gray-700 dark:text-gray-300 hover:text-primary-600 dark:hover:text-primary-400 transition-colors font-medium">
+                    생성된 콘텐츠
+                  </a>
                   <a href="/portfolio" className="text-gray-700 dark:text-gray-300 hover:text-primary-600 dark:hover:text-primary-400 transition-colors font-medium">
                     포트폴리오
+                  </a>
+                  <a href="/settings" className="text-gray-700 dark:text-gray-300 hover:text-primary-600 dark:hover:text-primary-400 transition-colors font-medium">
+                    설정
                   </a>
                   <ThemeToggle />
                 </div>

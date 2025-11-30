@@ -13,6 +13,10 @@ router = APIRouter()
 class UserProfileUpdate(BaseModel):
     solvedac_handle: str | None = None
     velog_id: str | None = None
+    portfolio_email: str | None = None
+    portfolio_name: str | None = None
+    portfolio_bio: str | None = None
+    max_portfolio_repos: int | None = None
 
 
 class StyleProfileUpdate(BaseModel):
@@ -28,14 +32,25 @@ async def get_user_profile(
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
-    """Get user profile (solved.ac, velog)."""
+    """Get user profile (solved.ac, velog, portfolio settings)."""
     profile = db.query(UserProfile).filter(UserProfile.user_id == current_user.id).first()
     if not profile:
-        return {"solvedac_handle": None, "velog_id": None}
+        return {
+            "solvedac_handle": None,
+            "velog_id": None,
+            "portfolio_email": None,
+            "portfolio_name": None,
+            "portfolio_bio": None,
+            "max_portfolio_repos": 6
+        }
     
     return {
         "solvedac_handle": profile.solvedac_handle,
         "velog_id": profile.velog_id,
+        "portfolio_email": profile.portfolio_email,
+        "portfolio_name": profile.portfolio_name,
+        "portfolio_bio": profile.portfolio_bio,
+        "max_portfolio_repos": profile.max_portfolio_repos or 6,
     }
 
 
@@ -55,6 +70,14 @@ async def update_user_profile(
         profile.solvedac_handle = data.solvedac_handle
     if data.velog_id is not None:
         profile.velog_id = data.velog_id
+    if data.portfolio_email is not None:
+        profile.portfolio_email = data.portfolio_email
+    if data.portfolio_name is not None:
+        profile.portfolio_name = data.portfolio_name
+    if data.portfolio_bio is not None:
+        profile.portfolio_bio = data.portfolio_bio
+    if data.max_portfolio_repos is not None:
+        profile.max_portfolio_repos = data.max_portfolio_repos
     
     db.commit()
     db.refresh(profile)
@@ -62,6 +85,10 @@ async def update_user_profile(
     return {
         "solvedac_handle": profile.solvedac_handle,
         "velog_id": profile.velog_id,
+        "portfolio_email": profile.portfolio_email,
+        "portfolio_name": profile.portfolio_name,
+        "portfolio_bio": profile.portfolio_bio,
+        "max_portfolio_repos": profile.max_portfolio_repos or 6,
     }
 
 

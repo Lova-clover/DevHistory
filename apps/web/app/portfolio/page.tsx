@@ -1,12 +1,15 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
 import { motion } from "framer-motion";
-import { Download, Share2, User, Code2, Award, BookOpen, Calendar, Github, Mail, Linkedin, ExternalLink } from "lucide-react";
+import { Download, Share2, User, Code2, Award, BookOpen, Calendar, Github, Mail, ExternalLink } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Tabs } from "@/components/ui/tabs";
+import { fetchWithAuth } from "@/lib/api";
+import html2canvas from "html2canvas";
+import jsPDF from "jspdf";
 
 const containerVariants = {
   hidden: { opacity: 0 },
@@ -29,8 +32,66 @@ const itemVariants = {
   },
 };
 
+interface PortfolioData {
+  user: {
+    id: string;
+    name: string;
+    email: string;
+    bio: string | null;
+    avatar_url: string;
+    github_username: string;
+  };
+  stats: {
+    total_repos: number;
+    total_commits: number;
+    total_problems: number;
+    total_blogs: number;
+    total_stars: number;
+    activity_days: number;
+    recent_commits: number;
+  };
+  languages: Array<{ name: string; count: number }>;
+  top_repos: Array<{
+    id: string;
+    name: string;
+    full_name: string;
+    description: string;
+    language: string;
+    stars: number;
+    forks: number;
+    html_url: string;
+  }>;
+  recent_activity: Array<{
+    id: string;
+    type: string;
+    date: string;
+    message: string;
+    repo_name: string;
+  }>;
+}
+
 export default function PortfolioPage() {
   const [activeTab, setActiveTab] = useState("overview");
+  const [portfolio, setPortfolio] = useState<PortfolioData | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [exporting, setExporting] = useState(false);
+  const portfolioRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    fetchPortfolio();
+  }, []);
+
+  const fetchPortfolio = async () => {
+    try {
+      const res = await fetchWithAuth("/api/me/portfolio");
+      const data = await res.json();
+      setPortfolio(data);
+    } catch (error) {
+      console.error("Failed to fetch portfolio:", error);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const tabs = [
     { id: "overview", label: "개요", icon: User },
@@ -39,8 +100,118 @@ export default function PortfolioPage() {
     { id: "activity", label: "활동", icon: Calendar },
   ];
 
-  const handleExport = () => {
-    alert("포트폴리오를 PDF로 내보내는 기능은 곧 추가됩니다!");
+  const handleExport = async () => {
+    if (!portfolioRef.current || exporting) return;
+
+    try {
+      setExporting(true);
+      
+      // Save current tab
+      const originalTab = activeTab;
+      
+      // Hide buttons and tabs during export
+      const buttons = portfolioRef.current.querySelectorAll('.export-hide');
+      buttons.forEach(btn => (btn as HTMLElement).style.display = 'none');
+
+      // Wait for initial render
+      await new Promise(resolve => setTimeout(resolve, 800));
+
+      // Create PDF
+      const pdf = new jsPDF({
+        orientation: 'portrait',
+        unit: 'mm',
+        format: 'a4',
+      });
+
+      const pdfWidth = pdf.internal.pageSize.getWidth();
+      const pdfHeight = pdf.internal.pageSize.getHeight();
+
+      // Capture each tab: overview, projects, skills
+      const tabsToCapture = ['overview', 'projects', 'skills'];
+      
+      for (let i = 0; i < tabsToCapture.length; i++) {
+        const tabId = tabsToCapture[i];
+        
+        // Switch to the tab
+        setActiveTab(tabId);
+        
+        // Wait for render and animations to complete
+        await new Promise(resolve => setTimeout(resolve, 1000));
+        
+        // Capture the portfolio content
+        const canvas = await html2canvas(portfolioRef.current, {
+          scale: 2,
+          useCORS: true,
+          logging: false,
+          backgroundColor: '#ffffff',
+          windowWidth: portfolioRef.current.scrollWidth,
+          windowHeight: portfolioRef.current.scrollHeight,
+        });
+
+        const imgData = canvas.toDataURL('image/png');
+        const imgWidth = canvas.width;
+        const imgHeight = canvas.height;
+        
+        // Calculate dimensions to fit on page width
+        const ratio = pdfWidth / imgWidth;
+        const scaledHeight = imgHeight * ratio;
+        
+        // Add new page if not the first tab
+        if (i > 0) {
+          pdf.addPage();
+        }
+        
+        // Split content across multiple pages if needed
+        let position = 0;
+        const pageHeight = pdfHeight;
+        
+        while (position < scaledHeight) {
+          if (position > 0) {
+            pdf.addPage();
+          }
+          
+          // Calculate the portion of the image for this page
+          const sourceY = position / ratio;
+          const sourceHeight = Math.min(pageHeight / ratio, imgHeight - sourceY);
+          
+          // Create a canvas for this page's content
+          const pageCanvas = document.createElement('canvas');
+          pageCanvas.width = imgWidth;
+          pageCanvas.height = sourceHeight;
+          
+          const ctx = pageCanvas.getContext('2d');
+          if (ctx) {
+            ctx.drawImage(
+              canvas,
+              0, sourceY,
+              imgWidth, sourceHeight,
+              0, 0,
+              imgWidth, sourceHeight
+            );
+            
+            const pageImgData = pageCanvas.toDataURL('image/png');
+            const pageScaledHeight = sourceHeight * ratio;
+            pdf.addImage(pageImgData, 'PNG', 0, 0, pdfWidth, pageScaledHeight);
+          }
+          
+          position += pageHeight;
+        }
+      }
+
+      // Restore buttons and original tab
+      buttons.forEach(btn => (btn as HTMLElement).style.display = '');
+      setActiveTab(originalTab);
+      
+      // Download PDF
+      const fileName = `${portfolio?.user.name || 'portfolio'}_${new Date().toISOString().split('T')[0]}.pdf`;
+      pdf.save(fileName);
+
+    } catch (error) {
+      console.error('PDF 생성 실패:', error);
+      alert('PDF 생성에 실패했습니다. 다시 시도해주세요.');
+    } finally {
+      setExporting(false);
+    }
   };
 
   const handleShare = () => {
@@ -48,9 +219,38 @@ export default function PortfolioPage() {
     alert("포트폴리오 링크가 클립보드에 복사되었습니다!");
   };
 
+  if (loading) {
+    return (
+      <div className="container mx-auto px-4 py-8 flex items-center justify-center min-h-screen">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-600 mx-auto mb-4"></div>
+          <p className="text-gray-600 dark:text-gray-400">포트폴리오를 불러오는 중...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (!portfolio) {
+    return (
+      <div className="container mx-auto px-4 py-8">
+        <Card className="p-8 text-center">
+          <p className="text-gray-600 dark:text-gray-400">포트폴리오 데이터를 불러올 수 없습니다.</p>
+        </Card>
+      </div>
+    );
+  }
+
+  // Calculate language percentages
+  const totalLanguageCount = portfolio.languages.reduce((sum, lang) => sum + lang.count, 0);
+  const languageSkills = portfolio.languages.map(lang => ({
+    name: lang.name,
+    level: totalLanguageCount > 0 ? Math.round((lang.count / totalLanguageCount) * 100) : 0
+  }));
+
   return (
     <div className="container mx-auto px-4 py-8">
       <motion.div
+        ref={portfolioRef}
         initial="hidden"
         animate="visible"
         variants={containerVariants}
@@ -66,14 +266,14 @@ export default function PortfolioPage() {
               개발 활동을 기반으로 자동 생성된 포트폴리오
             </p>
           </div>
-          <div className="flex gap-3">
+          <div className="flex gap-3 export-hide">
             <Button onClick={handleShare} variant="ghost">
               <Share2 className="w-5 h-5 mr-2" />
               공유
             </Button>
-            <Button onClick={handleExport}>
+            <Button onClick={handleExport} disabled={exporting}>
               <Download className="w-5 h-5 mr-2" />
-              PDF 내보내기
+              {exporting ? 'PDF 생성 중...' : 'PDF 내보내기'}
             </Button>
           </div>
         </motion.div>
@@ -84,40 +284,55 @@ export default function PortfolioPage() {
             <div className="flex items-start gap-8">
               {/* Avatar */}
               <div className="flex-shrink-0">
-                <div className="w-32 h-32 bg-gradient-to-br from-primary-400 to-indigo-500 rounded-full flex items-center justify-center text-white text-5xl font-bold">
-                  L
-                </div>
+                {portfolio.user.avatar_url ? (
+                  <img
+                    src={portfolio.user.avatar_url}
+                    alt={portfolio.user.name}
+                    className="w-32 h-32 rounded-full object-cover"
+                  />
+                ) : (
+                  <div className="w-32 h-32 bg-gradient-to-br from-primary-400 to-indigo-500 rounded-full flex items-center justify-center text-white text-5xl font-bold">
+                    {portfolio.user.name?.charAt(0).toUpperCase() || "U"}
+                  </div>
+                )}
               </div>
 
               {/* Profile Info */}
               <div className="flex-1">
                 <h2 className="text-3xl font-bold text-gray-900 dark:text-white mb-2">
-                  성주 (Lova-clover)
+                  {portfolio.user.name || "Unknown User"}
+                  {portfolio.user.github_username && (
+                    <span className="text-xl text-gray-600 dark:text-gray-400 ml-2">
+                      ({portfolio.user.github_username})
+                    </span>
+                  )}
                 </h2>
                 <p className="text-lg text-gray-600 dark:text-gray-400 mb-4">
                   Full Stack Developer
                 </p>
                 <p className="text-gray-700 dark:text-gray-300 mb-6 max-w-2xl">
-                  문제 해결과 효율적인 시스템 설계에 관심이 많은 개발자입니다. 
-                  백엔드부터 프론트엔드까지 다양한 기술 스택을 활용하여 완성도 높은 서비스를 만듭니다.
+                  {portfolio.user.bio || `${portfolio.stats.total_repos}개의 레포지토리와 ${portfolio.stats.total_commits}개의 커밋으로
+                  활발히 개발하고 있습니다.`}
                 </p>
 
                 {/* Social Links */}
                 <div className="flex gap-4">
+                  {portfolio.user.github_username && (
+                    <motion.a
+                      href={`https://github.com/${portfolio.user.github_username}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      whileHover={{ scale: 1.1 }}
+                      className="flex items-center gap-2 px-4 py-2 bg-white dark:bg-gray-800 rounded-lg shadow hover:shadow-md transition-all text-gray-900 dark:text-white"
+                    >
+                      <Github className="w-5 h-5" />
+                      <span>GitHub</span>
+                    </motion.a>
+                  )}
                   <motion.a
-                    href="https://github.com/Lova-clover"
-                    target="_blank"
-                    rel="noopener noreferrer"
+                    href={`mailto:${portfolio.user.email}`}
                     whileHover={{ scale: 1.1 }}
-                    className="flex items-center gap-2 px-4 py-2 bg-white dark:bg-gray-800 rounded-lg shadow hover:shadow-md transition-all"
-                  >
-                    <Github className="w-5 h-5" />
-                    <span>GitHub</span>
-                  </motion.a>
-                  <motion.a
-                    href="mailto:your-email@example.com"
-                    whileHover={{ scale: 1.1 }}
-                    className="flex items-center gap-2 px-4 py-2 bg-white dark:bg-gray-800 rounded-lg shadow hover:shadow-md transition-all"
+                    className="flex items-center gap-2 px-4 py-2 bg-white dark:bg-gray-800 rounded-lg shadow hover:shadow-md transition-all text-gray-900 dark:text-white"
                   >
                     <Mail className="w-5 h-5" />
                     <span>Email</span>
@@ -128,15 +343,21 @@ export default function PortfolioPage() {
               {/* Stats */}
               <div className="flex-shrink-0 grid grid-cols-1 gap-4 text-center">
                 <div className="bg-white dark:bg-gray-800 rounded-lg p-4 min-w-[120px]">
-                  <p className="text-3xl font-bold text-primary-600 dark:text-primary-400">12</p>
+                  <p className="text-3xl font-bold text-primary-600 dark:text-primary-400">
+                    {portfolio.stats.total_repos}
+                  </p>
                   <p className="text-sm text-gray-600 dark:text-gray-400">레포지토리</p>
                 </div>
                 <div className="bg-white dark:bg-gray-800 rounded-lg p-4">
-                  <p className="text-3xl font-bold text-green-600 dark:text-green-400">234</p>
+                  <p className="text-3xl font-bold text-green-600 dark:text-green-400">
+                    {portfolio.stats.total_problems}
+                  </p>
                   <p className="text-sm text-gray-600 dark:text-gray-400">문제 해결</p>
                 </div>
                 <div className="bg-white dark:bg-gray-800 rounded-lg p-4">
-                  <p className="text-3xl font-bold text-purple-600 dark:text-purple-400">1,289</p>
+                  <p className="text-3xl font-bold text-purple-600 dark:text-purple-400">
+                    {portfolio.stats.total_commits}
+                  </p>
                   <p className="text-sm text-gray-600 dark:text-gray-400">총 커밋</p>
                 </div>
               </div>
@@ -162,22 +383,30 @@ export default function PortfolioPage() {
                   <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
                     <div className="text-center p-4 bg-blue-50 dark:bg-blue-900/20 rounded-lg">
                       <Code2 className="w-8 h-8 mx-auto mb-2 text-blue-600 dark:text-blue-400" />
-                      <p className="text-2xl font-bold text-gray-900 dark:text-white">8</p>
+                      <p className="text-2xl font-bold text-gray-900 dark:text-white">
+                        {portfolio.stats.total_repos}
+                      </p>
                       <p className="text-sm text-gray-600 dark:text-gray-400">활성 프로젝트</p>
                     </div>
                     <div className="text-center p-4 bg-green-50 dark:bg-green-900/20 rounded-lg">
                       <Award className="w-8 h-8 mx-auto mb-2 text-green-600 dark:text-green-400" />
-                      <p className="text-2xl font-bold text-gray-900 dark:text-white">15</p>
+                      <p className="text-2xl font-bold text-gray-900 dark:text-white">
+                        {portfolio.languages.length}
+                      </p>
                       <p className="text-sm text-gray-600 dark:text-gray-400">기술 스택</p>
                     </div>
                     <div className="text-center p-4 bg-purple-50 dark:bg-purple-900/20 rounded-lg">
                       <BookOpen className="w-8 h-8 mx-auto mb-2 text-purple-600 dark:text-purple-400" />
-                      <p className="text-2xl font-bold text-gray-900 dark:text-white">45</p>
+                      <p className="text-2xl font-bold text-gray-900 dark:text-white">
+                        {portfolio.stats.total_blogs}
+                      </p>
                       <p className="text-sm text-gray-600 dark:text-gray-400">기술 블로그</p>
                     </div>
                     <div className="text-center p-4 bg-orange-50 dark:bg-orange-900/20 rounded-lg">
                       <Calendar className="w-8 h-8 mx-auto mb-2 text-orange-600 dark:text-orange-400" />
-                      <p className="text-2xl font-bold text-gray-900 dark:text-white">365+</p>
+                      <p className="text-2xl font-bold text-gray-900 dark:text-white">
+                        {portfolio.stats.activity_days}
+                      </p>
                       <p className="text-sm text-gray-600 dark:text-gray-400">활동 일수</p>
                     </div>
                   </div>
@@ -189,37 +418,8 @@ export default function PortfolioPage() {
           {/* Projects Tab */}
           {activeTab === "projects" && (
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              {[
-                {
-                  name: "FreshGuard",
-                  description: "식품 유통기한 관리 및 알림 시스템",
-                  tags: ["Python", "FastAPI", "PostgreSQL"],
-                  stars: 12,
-                  url: "https://github.com/Lova-clover/FreshGuard",
-                },
-                {
-                  name: "DevHistory",
-                  description: "개발 활동 자동 수집 및 포트폴리오 생성 플랫폼",
-                  tags: ["TypeScript", "Next.js", "FastAPI"],
-                  stars: 8,
-                  url: "#",
-                },
-                {
-                  name: "Path Planning",
-                  description: "A* 알고리즘 기반 경로 탐색 시뮬레이터",
-                  tags: ["Python", "Algorithm", "Visualization"],
-                  stars: 5,
-                  url: "#",
-                },
-                {
-                  name: "AI Study Assistant",
-                  description: "LLM 기반 학습 도우미 챗봇",
-                  tags: ["Python", "OpenAI", "LangChain"],
-                  stars: 15,
-                  url: "#",
-                },
-              ].map((project, index) => (
-                <motion.div key={index} variants={itemVariants} whileHover={{ scale: 1.02 }}>
+              {portfolio.top_repos.map((project, index) => (
+                <motion.div key={project.id} variants={itemVariants} whileHover={{ scale: 1.02 }}>
                   <Card className="p-6 h-full hover:shadow-xl transition-all duration-300">
                     <div className="flex items-start justify-between mb-4">
                       <h3 className="text-xl font-bold text-gray-900 dark:text-white">
@@ -231,17 +431,22 @@ export default function PortfolioPage() {
                       </div>
                     </div>
                     <p className="text-gray-600 dark:text-gray-400 mb-4">
-                      {project.description}
+                      {project.description || "설명 없음"}
                     </p>
                     <div className="flex flex-wrap gap-2 mb-4">
-                      {project.tags.map((tag) => (
-                        <Badge key={tag} variant="info" size="sm">
-                          {tag}
+                      {project.language && (
+                        <Badge variant="info" size="sm">
+                          {project.language}
                         </Badge>
-                      ))}
+                      )}
+                      {project.forks > 0 && (
+                        <Badge variant="default" size="sm">
+                          {project.forks} forks
+                        </Badge>
+                      )}
                     </div>
                     <a
-                      href={project.url}
+                      href={project.html_url}
                       target="_blank"
                       rel="noopener noreferrer"
                       className="flex items-center gap-2 text-primary-600 dark:text-primary-400 hover:underline"
@@ -258,65 +463,35 @@ export default function PortfolioPage() {
           {/* Skills Tab */}
           {activeTab === "skills" && (
             <div className="space-y-6">
-              {[
-                {
-                  category: "프론트엔드",
-                  skills: [
-                    { name: "React", level: 90 },
-                    { name: "Next.js", level: 85 },
-                    { name: "TypeScript", level: 88 },
-                    { name: "Tailwind CSS", level: 92 },
-                  ],
-                },
-                {
-                  category: "백엔드",
-                  skills: [
-                    { name: "FastAPI", level: 90 },
-                    { name: "Python", level: 95 },
-                    { name: "PostgreSQL", level: 80 },
-                    { name: "Redis", level: 75 },
-                  ],
-                },
-                {
-                  category: "DevOps",
-                  skills: [
-                    { name: "Docker", level: 85 },
-                    { name: "GitHub Actions", level: 80 },
-                    { name: "AWS", level: 70 },
-                    { name: "Nginx", level: 75 },
-                  ],
-                },
-              ].map((category, index) => (
-                <motion.div key={index} variants={itemVariants}>
-                  <Card className="p-6">
-                    <h3 className="text-xl font-bold text-gray-900 dark:text-white mb-4">
-                      {category.category}
-                    </h3>
-                    <div className="space-y-4">
-                      {category.skills.map((skill) => (
-                        <div key={skill.name}>
-                          <div className="flex items-center justify-between mb-2">
-                            <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
-                              {skill.name}
-                            </span>
-                            <span className="text-sm text-gray-500 dark:text-gray-400">
-                              {skill.level}%
-                            </span>
-                          </div>
-                          <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2">
-                            <motion.div
-                              initial={{ width: 0 }}
-                              animate={{ width: `${skill.level}%` }}
-                              transition={{ duration: 1, delay: index * 0.1 }}
-                              className="bg-gradient-to-r from-primary-500 to-primary-600 h-2 rounded-full"
-                            />
-                          </div>
+              <motion.div variants={itemVariants}>
+                <Card className="p-6">
+                  <h3 className="text-xl font-bold text-gray-900 dark:text-white mb-4">
+                    프로그래밍 언어 (커밋 기준)
+                  </h3>
+                  <div className="space-y-4">
+                    {languageSkills.slice(0, 10).map((skill) => (
+                      <div key={skill.name}>
+                        <div className="flex items-center justify-between mb-2">
+                          <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                            {skill.name}
+                          </span>
+                          <span className="text-sm text-gray-500 dark:text-gray-400">
+                            {skill.level}%
+                          </span>
                         </div>
-                      ))}
-                    </div>
-                  </Card>
-                </motion.div>
-              ))}
+                        <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2">
+                          <motion.div
+                            initial={{ width: 0 }}
+                            animate={{ width: `${skill.level}%` }}
+                            transition={{ duration: 1, delay: 0.1 }}
+                            className="bg-gradient-to-r from-primary-500 to-primary-600 h-2 rounded-full"
+                          />
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </Card>
+              </motion.div>
             </div>
           )}
 
@@ -329,49 +504,24 @@ export default function PortfolioPage() {
                     최근 활동
                   </h3>
                   <div className="space-y-4">
-                    {[
-                      { date: "2024-01-20", activity: "DevHistory 프로젝트 시작", type: "project" },
-                      { date: "2024-01-18", activity: "알고리즘 문제 15개 해결", type: "problem" },
-                      { date: "2024-01-15", activity: "Next.js 14 학습 블로그 작성", type: "blog" },
-                      { date: "2024-01-12", activity: "FreshGuard v2.0 릴리즈", type: "release" },
-                      { date: "2024-01-10", activity: "FastAPI 성능 최적화 완료", type: "commit" },
-                    ].map((item, index) => (
+                    {portfolio.recent_activity.map((item, index) => (
                       <motion.div
-                        key={index}
+                        key={item.id}
                         initial={{ opacity: 0, x: -20 }}
                         animate={{ opacity: 1, x: 0 }}
                         transition={{ delay: index * 0.1 }}
                         className="flex items-center gap-4 p-4 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
                       >
-                        <div
-                          className={`w-3 h-3 rounded-full ${
-                            item.type === "project"
-                              ? "bg-blue-500"
-                              : item.type === "problem"
-                              ? "bg-green-500"
-                              : item.type === "blog"
-                              ? "bg-purple-500"
-                              : item.type === "release"
-                              ? "bg-orange-500"
-                              : "bg-gray-500"
-                          }`}
-                        />
+                        <div className="w-3 h-3 rounded-full bg-blue-500" />
                         <div className="flex-1">
                           <p className="font-medium text-gray-900 dark:text-white">
-                            {item.activity}
+                            {item.message}
                           </p>
                           <p className="text-sm text-gray-500 dark:text-gray-400">
-                            {item.date}
+                            {item.repo_name} · {new Date(item.date).toLocaleDateString("ko-KR")}
                           </p>
                         </div>
-                        <Badge
-                          variant={
-                            item.type === "project" || item.type === "release"
-                              ? "success"
-                              : "info"
-                          }
-                          size="sm"
-                        >
+                        <Badge variant="info" size="sm">
                           {item.type}
                         </Badge>
                       </motion.div>

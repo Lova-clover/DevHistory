@@ -47,7 +47,7 @@ export default function OnboardingPage() {
           DevHistory를 사용하기 위해 몇 가지 정보를 설정해주세요
         </p>
 
-        <form onSubmit={handleSubmit} className="space-y-6 bg-white p-8 rounded-lg shadow-lg">
+        <form onSubmit={handleSubmit} className="space-y-6 bg-white dark:bg-gray-800 p-8 rounded-lg shadow-lg">
           <div>
             <label className="block text-sm font-medium mb-2">
               solved.ac 핸들 (선택)

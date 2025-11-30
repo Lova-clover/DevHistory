@@ -37,9 +37,9 @@ def sync_github_for_user(user_id: str):
         # Sync repositories
         repos = asyncio.run(sync_repos(str(user.id), github_account.access_token, db))
         
-        # Sync commits for each repo
+        # Sync all commits for each repo (no time limit)
         for repo in repos:
-            asyncio.run(sync_commits(str(user.id), repo["id"], github_account.access_token, db, since_days=30))
+            asyncio.run(sync_commits(str(user.id), repo["id"], github_account.access_token, db, since_days=None))
         
         return {"status": "success", "user_id": user_id, "repos_synced": len(repos)}
     finally:

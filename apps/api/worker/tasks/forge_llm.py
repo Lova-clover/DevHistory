@@ -27,7 +27,18 @@ def generate_weekly_report_llm(user_id: str, weekly_summary_id: str):
         
         style_profile = db.query(StyleProfile).filter(StyleProfile.user_id == user_id).first()
         if not style_profile:
-            return {"error": "Style profile not configured"}
+            # Create default style profile
+            style_profile = StyleProfile(
+                user_id=user_id,
+                language="ko",
+                tone="technical",
+                blog_structure=["Summary", "What I did", "Learned", "Next"],
+                report_structure=["Summary", "What I did", "Learned", "Next"],
+                extra_instructions=None
+            )
+            db.add(style_profile)
+            db.commit()
+            db.refresh(style_profile)
         
         # Generate content
         from merge_forge.weekly_report import generate_weekly_report
@@ -37,8 +48,8 @@ def generate_weekly_report_llm(user_id: str, weekly_summary_id: str):
         generated = GeneratedContent(
             user_id=user_id,
             type="weekly_report",
-            source_id=weekly_summary_id,
-            markdown_content=content
+            source_ref=f"weekly:{weekly_summary_id}",
+            content=content
         )
         db.add(generated)
         db.commit()
@@ -63,7 +74,18 @@ def generate_repo_blog_llm(user_id: str, repo_id: str):
         
         style_profile = db.query(StyleProfile).filter(StyleProfile.user_id == user_id).first()
         if not style_profile:
-            return {"error": "Style profile not configured"}
+            # Create default style profile
+            style_profile = StyleProfile(
+                user_id=user_id,
+                language="ko",
+                tone="technical",
+                blog_structure=["Intro", "Problem", "Approach", "Result", "Next"],
+                report_structure=["Summary", "What I did", "Learned", "Next"],
+                extra_instructions=None
+            )
+            db.add(style_profile)
+            db.commit()
+            db.refresh(style_profile)
         
         # Generate content
         from merge_forge.repo_blog import generate_repo_blog
@@ -73,8 +95,8 @@ def generate_repo_blog_llm(user_id: str, repo_id: str):
         generated = GeneratedContent(
             user_id=user_id,
             type="repo_blog",
-            source_id=repo_id,
-            markdown_content=content
+            source_ref=f"repo:{repo_id}",
+            content=content
         )
         db.add(generated)
         db.commit()

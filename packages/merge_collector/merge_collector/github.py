@@ -72,10 +72,36 @@ async def sync_repos(user_id: str, access_token: str, db: Session) -> List[Dict[
             existing_repo.forks = repo_data.get("forks_count", 0)
             existing_repo.is_fork = repo_data.get("fork", False)
             existing_repo.last_synced_at = datetime.utcnow()
-            existing_repo.updated_at = datetime.utcnow()
+            # Update created_at from GitHub if available
+            if repo_data.get("created_at"):
+                try:
+                    existing_repo.created_at = datetime.fromisoformat(repo_data["created_at"].replace("Z", "+00:00"))
+                except (ValueError, AttributeError):
+                    pass
+            # Use GitHub's updated_at if available, otherwise use current time
+            if repo_data.get("updated_at"):
+                try:
+                    existing_repo.updated_at = datetime.fromisoformat(repo_data["updated_at"].replace("Z", "+00:00"))
+                except (ValueError, AttributeError):
+                    existing_repo.updated_at = datetime.utcnow()
             synced_repos.append(existing_repo)
         else:
-            # Create new repo
+            # Create new repo - use GitHub's created_at and updated_at
+            created_at = datetime.utcnow()
+            updated_at = datetime.utcnow()
+            
+            if repo_data.get("created_at"):
+                try:
+                    created_at = datetime.fromisoformat(repo_data["created_at"].replace("Z", "+00:00"))
+                except (ValueError, AttributeError):
+                    pass
+            
+            if repo_data.get("updated_at"):
+                try:
+                    updated_at = datetime.fromisoformat(repo_data["updated_at"].replace("Z", "+00:00"))
+                except (ValueError, AttributeError):
+                    pass
+            
             new_repo = Repo(
                 user_id=user_id,
                 provider_repo_id=str(repo_data["id"]),
@@ -86,7 +112,9 @@ async def sync_repos(user_id: str, access_token: str, db: Session) -> List[Dict[
                 stars=repo_data.get("stargazers_count", 0),
                 forks=repo_data.get("forks_count", 0),
                 is_fork=repo_data.get("fork", False),
-                last_synced_at=datetime.utcnow()
+                last_synced_at=datetime.utcnow(),
+                created_at=created_at,
+                updated_at=updated_at
             )
             db.add(new_repo)
             synced_repos.append(new_repo)
@@ -108,7 +136,7 @@ async def sync_commits(
     repo_id: str,
     access_token: str,
     db: Session,
-    since_days: int = 30
+    since_days: int | None = None
 ) -> List[Dict[str, Any]]:
     """
     Sync commits for a specific repository.
@@ -118,13 +146,16 @@ async def sync_commits(
         repo_id: Repository UUID
         access_token: GitHub OAuth access token
         db: Database session
-        since_days: Number of days to look back
+        since_days: Number of days to look back (None = all commits)
         
     Returns:
         List of synced commit data
     """
-    since = datetime.utcnow() - timedelta(days=since_days)
-    since_iso = since.isoformat() + "Z"
+    # Build params
+    params = {"per_page": 100}
+    if since_days is not None:
+        since = datetime.utcnow() - timedelta(days=since_days)
+        params["since"] = since.isoformat() + "Z"
     
     # Get repo from database
     from app.models.repo import Repo
@@ -135,27 +166,43 @@ async def sync_commits(
     if not repo:
         raise ResourceNotFoundError("Repository", repo_id)
     
-    # Apply rate limiting
-    await github_rate_limiter.acquire()
+    # Fetch all commits with pagination
+    all_commits = []
+    page = 1
     
-    # Call GitHub API for commits
-    async def fetch_commits():
-        async with httpx.AsyncClient(timeout=30.0) as client:
-            response = await client.get(
-                f"https://api.github.com/repos/{repo.full_name}/commits",
-                headers={
-                    "Authorization": f"Bearer {access_token}",
-                    "Accept": "application/vnd.github.v3+json",
-                },
-                params={
-                    "since": since_iso,
-                    "per_page": 100,
-                }
-            )
-            response.raise_for_status()
-            return response.json()
+    while True:
+        # Apply rate limiting
+        await github_rate_limiter.acquire()
+        
+        # Call GitHub API for commits
+        async def fetch_commits():
+            async with httpx.AsyncClient(timeout=30.0) as client:
+                page_params = {**params, "page": page}
+                response = await client.get(
+                    f"https://api.github.com/repos/{repo.full_name}/commits",
+                    headers={
+                        "Authorization": f"Bearer {access_token}",
+                        "Accept": "application/vnd.github.v3+json",
+                    },
+                    params=page_params
+                )
+                response.raise_for_status()
+                return response.json()
+        
+        commits_data = await retry_with_backoff(fetch_commits)
+        
+        if not commits_data:
+            break
+            
+        all_commits.extend(commits_data)
+        
+        # If we got less than per_page, we've reached the end
+        if len(commits_data) < 100:
+            break
+            
+        page += 1
     
-    commits_data = await retry_with_backoff(fetch_commits)
+    commits_data = all_commits
     
     # Upsert commits into database
     synced_commits = []

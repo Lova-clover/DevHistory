@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
+import { fetchWithAuth } from "@/lib/api";
 
 export default function RepoDetailPage() {
   const params = useParams();
@@ -19,7 +20,7 @@ export default function RepoDetailPage() {
 
   const fetchRepo = async () => {
     try {
-      const res = await fetch(`/api/repos/${params.id}`);
+      const res = await fetchWithAuth(`/api/repos/${params.id}`);
       const data = await res.json();
       setRepo(data);
     } catch (error) {
@@ -32,7 +33,7 @@ export default function RepoDetailPage() {
   const generateBlog = async () => {
     setGenerating(true);
     try {
-      const res = await fetch(`/api/generate/repo-blog/${params.id}`, {
+      const res = await fetchWithAuth(`/api/generate/repo-blog/${params.id}`, {
         method: "POST",
       });
       const data = await res.json();
@@ -69,14 +70,14 @@ export default function RepoDetailPage() {
       </div>
 
       {/* Recent Commits */}
-      <div className="bg-white p-6 rounded-lg shadow mb-8">
+      <div className="bg-white dark:bg-gray-800 p-6 rounded-lg shadow mb-8">
         <h2 className="text-2xl font-bold mb-4">최근 커밋</h2>
         {repo.recent_commits?.length > 0 ? (
           <div className="space-y-3">
             {repo.recent_commits.map((commit: any) => (
               <div key={commit.sha} className="border-l-4 border-primary-500 pl-4">
                 <p className="font-medium">{commit.message}</p>
-                <p className="text-sm text-gray-500">
+                <p className="text-sm text-gray-500 dark:text-gray-400">
                   {new Date(commit.committed_at).toLocaleDateString()} ·
                   +{commit.additions || 0} -{commit.deletions || 0}
                 </p>
@@ -84,18 +85,18 @@ export default function RepoDetailPage() {
             ))}
           </div>
         ) : (
-          <p className="text-gray-500">커밋이 없습니다</p>
+          <p className="text-gray-500 dark:text-gray-400">커밋이 없습니다</p>
         )}
       </div>
 
       {/* Blog Generation */}
-      <div className="bg-white p-8 rounded-lg shadow">
-        <h2 className="text-2xl font-bold mb-4">블로그 초안 생성</h2>
+      <div className="bg-white dark:bg-gray-800 p-8 rounded-lg shadow">
+        <h2 className="text-2xl font-bold mb-4">블로그 글 작성</h2>
         
         {generatedContent ? (
           <div>
             <div className="flex justify-between items-center mb-4">
-              <p className="text-gray-600">AI가 생성한 블로그 초안입니다</p>
+              <p className="text-gray-600">AI가 생성한 블로그 글입니다</p>
               <button
                 onClick={() => navigator.clipboard.writeText(generatedContent)}
                 className="border border-primary-600 text-primary-600 px-4 py-2 rounded-lg hover:bg-primary-50"
@@ -110,14 +111,15 @@ export default function RepoDetailPage() {
         ) : (
           <div className="text-center py-8">
             <p className="text-gray-600 mb-6">
-              이 프로젝트에 대한 블로그 글 초안을 AI가 자동으로 작성해드립니다
+              이 프로젝트에 대한 기술 블로그 글을 AI가 자동으로 작성해드립니다.<br />
+              당신의 Velog 스타일로 프로젝트 경험을 정리해보세요.
             </p>
             <button
               onClick={generateBlog}
               disabled={generating}
               className="bg-primary-600 text-white px-6 py-3 rounded-lg hover:bg-primary-700 disabled:bg-gray-400"
             >
-              {generating ? "생성 중..." : "블로그 초안 생성"}
+              {generating ? "생성 중..." : "블로그 글 작성"}
             </button>
           </div>
         )}

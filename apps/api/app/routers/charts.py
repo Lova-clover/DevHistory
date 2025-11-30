@@ -51,7 +51,7 @@ async def get_language_distribution(
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
-    """Get programming language distribution from repos."""
+    """Get programming language distribution based on repository count."""
     # Query repos grouped by language
     language_stats = db.query(
         Repo.language,

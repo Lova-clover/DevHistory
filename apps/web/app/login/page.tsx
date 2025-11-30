@@ -4,7 +4,7 @@ export default function LoginPage() {
       <div className="max-w-md mx-auto text-center">
         <h1 className="text-4xl font-bold mb-8">로그인</h1>
         
-        <div className="bg-white p-8 rounded-lg shadow-lg">
+        <div className="bg-white dark:bg-gray-800 p-8 rounded-lg shadow-lg">
           <p className="text-gray-600 mb-6">
             GitHub 계정으로 DevHistory를 시작하세요
           </p>

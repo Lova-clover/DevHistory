@@ -28,10 +28,10 @@ async def sync_blog_posts(user_id: str, velog_id: str, db: Session) -> List[Dict
     # Clean velog_id (remove @ if present)
     clean_id = velog_id.lstrip("@")
     
-    # Fetch RSS feed
+    # Fetch RSS feed - Velog uses api.velog.io domain
     async def fetch_rss():
         async with httpx.AsyncClient(timeout=30.0) as client:
-            response = await client.get(f"https://velog.io/rss/@{clean_id}")
+            response = await client.get(f"https://api.velog.io/rss/@{clean_id}")
             response.raise_for_status()
             return response.text
     

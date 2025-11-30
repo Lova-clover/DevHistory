@@ -37,7 +37,7 @@ async def trigger_sync(
     module = __import__(module_name, fromlist=[func_name])
     task_func = getattr(module, func_name)
     
-    task = task_func.delay(str(current_user.id), force_full=request.force_full_sync)
+    task = task_func.delay(str(current_user.id))
     
     # Get last sync time
     last_synced = None
