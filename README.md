@@ -1,5 +1,7 @@
 # DevHistory – Dev Activity Auto-Portfolio
 
+![DevHistory 홈페이지](./images/homepage.png)
+
 **DevHistory는 개발자의 활동 로그를 자동으로 모아서 포트폴리오로 재사용할 수 있게 만드는 서비스입니다.**
 
 개발자, 특히 학생/주니어는 GitHub에 커밋하고, 백준/solved.ac에서 문제 풀고, 노트/블로그도 쓰지만,  
@@ -94,6 +96,22 @@ DevHistory의 전체 동작 흐름은 다음과 같습니다.
 - 사용자는 **"생산보다 검토/수정에 집중"**할 수 있게 됩니다.
 
 이 파이프라인을 통해, **"데이터 수집 + 누적 + 분석 + 한 방에 아웃풋"**이라는 흐름이 완성됩니다.
+
+---
+
+## 📸 스크린샷
+
+### 대시보드
+![대시보드](./images/dashboard.png)
+*개발 활동 통계와 트렌드를 한눈에*
+
+### 포트폴리오
+![포트폴리오](./images/portfolio.png)
+*자동 생성된 포트폴리오 페이지*
+
+### 생성된 블로그 글
+![생성된 블로그](./images/generated-blog.png)
+*LLM이 작성한 기술 블로그*
 
 ---
 

@@ -1,8 +1,17 @@
 # DevHistory 시작 가이드
 
+![DevHistory 홈페이지](./images/homepage.png)
+
 ## 🎯 프로젝트 개요
 
 DevHistory는 개발자의 GitHub 활동, solved.ac 문제 풀이, 블로그/노트를 자동으로 수집하고 AI를 활용해 포트폴리오와 블로그 콘텐츠를 생성하는 웹 서비스입니다.
+
+**주요 기능:**
+- 🔄 GitHub/Velog/Solved.ac 자동 동기화
+- 📊 활동 통계 및 트렌드 대시보드
+- 🤖 LLM 기반 블로그 글 자동 생성
+- 📄 포트폴리오 PDF 내보내기
+- 🌙 다크모드 지원
 
 ## 📋 전체 구조
 
