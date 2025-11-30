@@ -64,10 +64,14 @@ export default function ReposPage() {
     try {
       const res = await fetch("/api/repos");
       const data = await res.json();
-      setRepos(data);
-      setFilteredRepos(data);
+      // Ensure data is an array
+      const reposArray = Array.isArray(data) ? data : [];
+      setRepos(reposArray);
+      setFilteredRepos(reposArray);
     } catch (error) {
       console.error("Failed to fetch repos:", error);
+      setRepos([]);
+      setFilteredRepos([]);
     } finally {
       setLoading(false);
     }
@@ -312,31 +316,6 @@ export default function ReposPage() {
           </>
         )}
       </motion.div>
-    </div>
-  );
-}
-        <div className="grid md:grid-cols-2 gap-6">
-          {repos.map((repo) => (
-            <a
-              key={repo.id}
-              href={`/repos/${repo.id}`}
-              className="block bg-white p-6 rounded-lg shadow hover:shadow-lg transition"
-            >
-              <div className="flex justify-between items-start mb-4">
-                <h3 className="text-xl font-bold">{repo.full_name}</h3>
-                <span className="text-yellow-500">⭐ {repo.stars}</span>
-              </div>
-              <p className="text-gray-600 mb-4 line-clamp-2">
-                {repo.description || "설명 없음"}
-              </p>
-              <div className="flex gap-4 text-sm text-gray-500">
-                {repo.language && <span>📝 {repo.language}</span>}
-                <span>🍴 {repo.forks} forks</span>
-              </div>
-            </a>
-          ))}
-        </div>
-      )}
     </div>
   );
 }

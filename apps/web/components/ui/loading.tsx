@@ -79,3 +79,6 @@ export function Skeleton({ className = '', count = 1 }: SkeletonProps) {
     </>
   );
 }
+
+// Alias for LoadingSpinner
+export const Loading = LoadingSpinner;

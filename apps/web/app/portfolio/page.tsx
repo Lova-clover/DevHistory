@@ -386,33 +386,3 @@ export default function PortfolioPage() {
     </div>
   );
 }
-            <div className="flex gap-2">
-              <span className="text-sm bg-yellow-100 text-yellow-800 px-2 py-1 rounded">JavaScript</span>
-              <span className="text-sm bg-red-100 text-red-800 px-2 py-1 rounded">Canvas</span>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* Skills & Stats */}
-      <div className="bg-white p-8 rounded-lg shadow">
-        <h2 className="text-2xl font-bold mb-6">기술 스택</h2>
-        <div className="flex flex-wrap gap-3">
-          <span className="px-4 py-2 bg-gray-100 rounded-full">Python</span>
-          <span className="px-4 py-2 bg-gray-100 rounded-full">TypeScript</span>
-          <span className="px-4 py-2 bg-gray-100 rounded-full">React</span>
-          <span className="px-4 py-2 bg-gray-100 rounded-full">FastAPI</span>
-          <span className="px-4 py-2 bg-gray-100 rounded-full">PostgreSQL</span>
-          <span className="px-4 py-2 bg-gray-100 rounded-full">Docker</span>
-        </div>
-      </div>
-
-      {/* Public Link */}
-      <div className="mt-8 text-center">
-        <button className="border border-primary-600 text-primary-600 px-6 py-3 rounded-lg hover:bg-primary-50">
-          공개 링크 생성
-        </button>
-      </div>
-    </div>
-  );
-}

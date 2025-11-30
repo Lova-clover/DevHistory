@@ -230,7 +230,6 @@ export default function DashboardPage() {
         {/* Charts Row */}
         <motion.div variants={itemVariants} className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           <LanguageChart data={languageData} />
-          </Card>
 
           <Card className="p-6">
             <h3 className="text-xl font-semibold text-gray-900 dark:text-white mb-6">

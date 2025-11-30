@@ -6,17 +6,20 @@ import { useState } from 'react';
 interface Tab {
   id: string;
   label: string;
-  icon?: React.ReactNode;
+  icon?: React.ComponentType<{ className?: string }>;
 }
 
 interface TabsProps {
   tabs: Tab[];
   activeTab: string;
-  onTabChange: (tabId: string) => void;
-  children: React.ReactNode;
+  onChange?: (tabId: string) => void;
+  onTabChange?: (tabId: string) => void;
+  children?: React.ReactNode;
 }
 
-export function Tabs({ tabs, activeTab, onTabChange, children }: TabsProps) {
+export function Tabs({ tabs, activeTab, onChange, onTabChange, children }: TabsProps) {
+  const handleTabChange = onChange || onTabChange || (() => {});
+  
   return (
     <div>
       {/* Tab Headers */}
@@ -25,7 +28,7 @@ export function Tabs({ tabs, activeTab, onTabChange, children }: TabsProps) {
           {tabs.map((tab) => (
             <button
               key={tab.id}
-              onClick={() => onTabChange(tab.id)}
+              onClick={() => handleTabChange(tab.id)}
               className={`
                 relative px-4 py-3 text-sm font-medium transition-colors
                 ${
@@ -36,7 +39,7 @@ export function Tabs({ tabs, activeTab, onTabChange, children }: TabsProps) {
               `}
             >
               <div className="flex items-center gap-2">
-                {tab.icon}
+                {tab.icon && <tab.icon className="w-4 h-4" />}
                 {tab.label}
               </div>
               {activeTab === tab.id && (
@@ -52,17 +55,19 @@ export function Tabs({ tabs, activeTab, onTabChange, children }: TabsProps) {
       </div>
 
       {/* Tab Content */}
-      <div className="mt-6">
-        <motion.div
-          key={activeTab}
-          initial={{ opacity: 0, y: 10 }}
-          animate={{ opacity: 1, y: 0 }}
-          exit={{ opacity: 0, y: -10 }}
-          transition={{ duration: 0.2 }}
-        >
-          {children}
-        </motion.div>
-      </div>
+      {children && (
+        <div className="mt-6">
+          <motion.div
+            key={activeTab}
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -10 }}
+            transition={{ duration: 0.2 }}
+          >
+            {children}
+          </motion.div>
+        </div>
+      )}
     </div>
   );
 }

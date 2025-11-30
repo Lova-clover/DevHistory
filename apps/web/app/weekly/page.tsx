@@ -59,9 +59,11 @@ export default function WeeklyPage() {
     try {
       const res = await fetch("/api/weekly");
       const data = await res.json();
-      setWeeklies(data);
+      // Ensure data is an array
+      setWeeklies(Array.isArray(data) ? data : []);
     } catch (error) {
       console.error("Failed to fetch weeklies:", error);
+      setWeeklies([]);
     } finally {
       setLoading(false);
     }
@@ -385,38 +387,6 @@ export default function WeeklyPage() {
           </div>
         </div>
       </Modal>
-    </div>
-  );
-}
-              className="block bg-white p-6 rounded-lg shadow hover:shadow-lg transition"
-            >
-              <div className="flex justify-between items-center">
-                <div>
-                  <h3 className="text-xl font-bold mb-2">
-                    {weekly.week_start} ~ {weekly.week_end}
-                  </h3>
-                  <div className="flex gap-6 text-sm text-gray-600">
-                    <span>커밋 {weekly.commit_count}개</span>
-                    <span>문제 {weekly.problem_count}개</span>
-                    <span>노트 {weekly.note_count}개</span>
-                  </div>
-                </div>
-                <div>
-                  {weekly.has_llm_summary ? (
-                    <span className="bg-green-100 text-green-800 px-3 py-1 rounded-full text-sm">
-                      리포트 있음
-                    </span>
-                  ) : (
-                    <span className="bg-gray-100 text-gray-600 px-3 py-1 rounded-full text-sm">
-                      리포트 없음
-                    </span>
-                  )}
-                </div>
-              </div>
-            </a>
-          ))}
-        </div>
-      )}
     </div>
   );
 }
