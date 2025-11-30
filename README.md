@@ -102,15 +102,18 @@ DevHistory의 전체 동작 흐름은 다음과 같습니다.
 ## 📸 스크린샷
 
 ### 대시보드
-![대시보드](./images/dashboard.png)
+![DevHistory 대시보드](https://velog.velcdn.com/images/lova-clover/post/ed67c82b-0c57-4439-b007-0d8f76e077d2/image.png)
+
 *개발 활동 통계와 트렌드를 한눈에*
 
 ### 포트폴리오
-![포트폴리오](./images/portfolio.png)
+![포트폴리오](https://velog.velcdn.com/images/lova-clover/post/314f698e-b809-4c2b-bf0e-40dff7221200/image.png)
+
 *자동 생성된 포트폴리오 페이지*
 
 ### 생성된 블로그 글
 ![생성된 블로그](./images/generated-blog.png)
+
 *LLM이 작성한 기술 블로그*
 
 ---
