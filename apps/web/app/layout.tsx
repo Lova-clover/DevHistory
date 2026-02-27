@@ -41,7 +41,16 @@ export default function RootLayout({
                     레포지토리
                   </a>
                   <a href="/contents" className="text-gray-700 dark:text-gray-300 hover:text-primary-600 dark:hover:text-primary-400 transition-colors font-medium">
-                    생성된 콘텐츠
+                    콘텐츠
+                  </a>
+                  <a href="/coach" className="text-gray-700 dark:text-gray-300 hover:text-primary-600 dark:hover:text-primary-400 transition-colors font-medium">
+                    코칭
+                  </a>
+                  <a href="/resume" className="text-gray-700 dark:text-gray-300 hover:text-primary-600 dark:hover:text-primary-400 transition-colors font-medium">
+                    이력서
+                  </a>
+                  <a href="/writing-style" className="text-gray-700 dark:text-gray-300 hover:text-primary-600 dark:hover:text-primary-400 transition-colors font-medium">
+                    글쓰기
                   </a>
                   <a href="/portfolio" className="text-gray-700 dark:text-gray-300 hover:text-primary-600 dark:hover:text-primary-400 transition-colors font-medium">
                     포트폴리오

@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
-import { RefreshCw, Github, CheckCircle, XCircle, Clock } from "lucide-react";
+import { RefreshCw, Github, CheckCircle, XCircle, Clock, Key, Eye, EyeOff, Trash2, ShieldCheck } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { fetchWithAuth } from "@/lib/api";
@@ -45,6 +45,15 @@ interface UserProfile {
   max_portfolio_repos: number;
 }
 
+interface LlmKeyInfo {
+  provider: string;
+  key_last4: string;
+  model: string;
+  created_at: string;
+  last_verified_at: string | null;
+  last_used_at: string | null;
+}
+
 export default function SettingsPage() {
   const [syncStatuses, setSyncStatuses] = useState<SyncStatus[]>([]);
   const [syncing, setSyncing] = useState<{ [key: string]: boolean }>({});
@@ -67,10 +76,113 @@ export default function SettingsPage() {
     max_portfolio_repos: 6
   });
 
+  // LLM Key state
+  const [llmKey, setLlmKey] = useState<LlmKeyInfo | null>(null);
+  const [showKeyInput, setShowKeyInput] = useState(false);
+  const [newApiKey, setNewApiKey] = useState("");
+  const [newModel, setNewModel] = useState("gpt-4o-mini");
+  const [showApiKey, setShowApiKey] = useState(false);
+  const [keyValidating, setKeyValidating] = useState(false);
+  const [keySaving, setKeySaving] = useState(false);
+  const [keyTesting, setKeyTesting] = useState(false);
+
   useEffect(() => {
     fetchSyncStatus();
     fetchProfile();
+    fetchLlmKey();
   }, []);
+
+  const fetchLlmKey = async () => {
+    try {
+      const res = await fetchWithAuth("/api/me/llm");
+      if (res.ok) {
+        const data = await res.json();
+        setLlmKey(data);
+      }
+    } catch (error) {
+      console.error("Failed to fetch LLM key:", error);
+    }
+  };
+
+  const saveLlmKey = async () => {
+    if (!newApiKey || newApiKey.length < 10) {
+      alert("유효한 API 키를 입력해주세요");
+      return;
+    }
+    setKeySaving(true);
+    try {
+      const res = await fetchWithAuth("/api/me/llm", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ api_key: newApiKey, model: newModel, provider: "openai" }),
+      });
+      if (!res.ok) {
+        const err = await res.json();
+        throw new Error(err.detail || "저장 실패");
+      }
+      const data = await res.json();
+      setLlmKey(data);
+      setNewApiKey("");
+      setShowKeyInput(false);
+      trackEvent({ event_name: "llm_key_saved", meta: { model: newModel } });
+      alert("API 키가 안전하게 저장되었습니다");
+    } catch (error: any) {
+      alert(error.message || "API 키 저장에 실패했습니다");
+    } finally {
+      setKeySaving(false);
+    }
+  };
+
+  const validateLlmKey = async () => {
+    if (!newApiKey) return;
+    setKeyValidating(true);
+    try {
+      const res = await fetchWithAuth("/api/me/llm/validate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ api_key: newApiKey, model: newModel, provider: "openai" }),
+      });
+      const data = await res.json();
+      if (data.valid) {
+        alert("✅ API 키가 유효합니다!");
+      } else {
+        alert(`❌ 유효하지 않은 API 키: ${data.error || "알 수 없는 오류"}`);
+      }
+    } catch {
+      alert("검증 중 오류가 발생했습니다");
+    } finally {
+      setKeyValidating(false);
+    }
+  };
+
+  const testStoredKey = async () => {
+    setKeyTesting(true);
+    try {
+      const res = await fetchWithAuth("/api/me/llm/test", { method: "POST" });
+      const data = await res.json();
+      if (data.valid) {
+        alert("✅ 저장된 API 키가 정상 작동합니다!");
+      } else {
+        alert(`❌ 저장된 키 오류: ${data.error || "알 수 없는 오류"}`);
+      }
+    } catch {
+      alert("테스트 중 오류가 발생했습니다");
+    } finally {
+      setKeyTesting(false);
+    }
+  };
+
+  const deleteLlmKey = async () => {
+    if (!confirm("API 키를 삭제하시겠습니까? AI 기능을 사용하려면 다시 등록해야 합니다.")) return;
+    try {
+      await fetchWithAuth("/api/me/llm", { method: "DELETE" });
+      setLlmKey(null);
+      trackEvent({ event_name: "llm_key_deleted" });
+      alert("API 키가 삭제되었습니다");
+    } catch {
+      alert("삭제에 실패했습니다");
+    }
+  };
 
   const fetchProfile = async () => {
     try {
@@ -386,6 +498,166 @@ export default function SettingsPage() {
                   포트폴리오에 표시될 프로젝트는 커밋 수가 많은 순서로 선택됩니다.
                 </p>
               </div>
+            </div>
+          </Card>
+
+          <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-4 mt-8">
+            🔑 OpenAI API 키
+          </h2>
+
+          <Card className="p-6">
+            <div className="space-y-4">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <div className="p-3 bg-emerald-100 dark:bg-emerald-900/30 rounded-lg">
+                    <Key className="w-6 h-6 text-emerald-600 dark:text-emerald-400" />
+                  </div>
+                  <div>
+                    <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
+                      AI 콘텐츠 생성 키
+                    </h3>
+                    <p className="text-sm text-gray-500 dark:text-gray-400">
+                      블로그 자동 생성, 주간 리포트 등 AI 기능에 사용됩니다
+                    </p>
+                  </div>
+                </div>
+                {llmKey && !showKeyInput && (
+                  <div className="flex items-center gap-2">
+                    <span className="inline-flex items-center gap-1 px-3 py-1 bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300 text-sm rounded-full">
+                      <CheckCircle className="w-3.5 h-3.5" />
+                      등록됨
+                    </span>
+                  </div>
+                )}
+              </div>
+
+              {llmKey && !showKeyInput ? (
+                <div className="bg-gray-50 dark:bg-gray-800 rounded-lg p-4 space-y-3">
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
+                    <div>
+                      <span className="text-gray-500 dark:text-gray-400 block">Provider</span>
+                      <span className="font-medium text-gray-900 dark:text-white capitalize">{llmKey.provider}</span>
+                    </div>
+                    <div>
+                      <span className="text-gray-500 dark:text-gray-400 block">API 키</span>
+                      <span className="font-mono font-medium text-gray-900 dark:text-white">••••••••{llmKey.key_last4}</span>
+                    </div>
+                    <div>
+                      <span className="text-gray-500 dark:text-gray-400 block">모델</span>
+                      <span className="font-medium text-gray-900 dark:text-white">{llmKey.model}</span>
+                    </div>
+                    <div>
+                      <span className="text-gray-500 dark:text-gray-400 block">마지막 사용</span>
+                      <span className="font-medium text-gray-900 dark:text-white">
+                        {llmKey.last_used_at ? new Date(llmKey.last_used_at).toLocaleDateString("ko-KR") : "없음"}
+                      </span>
+                    </div>
+                  </div>
+                  <div className="flex gap-2 pt-2 border-t border-gray-200 dark:border-gray-700">
+                    <Button
+                      onClick={testStoredKey}
+                      disabled={keyTesting}
+                      variant="outline"
+                      className="text-sm"
+                    >
+                      <ShieldCheck className="w-4 h-4 mr-1.5" />
+                      {keyTesting ? "테스트 중..." : "키 테스트"}
+                    </Button>
+                    <Button
+                      onClick={() => { setShowKeyInput(true); setNewModel(llmKey.model); }}
+                      variant="outline"
+                      className="text-sm"
+                    >
+                      키 변경
+                    </Button>
+                    <Button
+                      onClick={deleteLlmKey}
+                      variant="ghost"
+                      className="text-sm text-red-600 hover:text-red-700 hover:bg-red-50 dark:hover:bg-red-900/20"
+                    >
+                      <Trash2 className="w-4 h-4 mr-1.5" />
+                      삭제
+                    </Button>
+                  </div>
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  {!llmKey && (
+                    <div className="bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-lg p-4">
+                      <p className="text-sm text-amber-800 dark:text-amber-200">
+                        ⚠️ AI 기능을 사용하려면 OpenAI API 키를 등록해야 합니다.{" "}
+                        <a href="https://platform.openai.com/api-keys" target="_blank" className="underline font-medium">
+                          OpenAI에서 발급받기 →
+                        </a>
+                      </p>
+                    </div>
+                  )}
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                      OpenAI API 키
+                    </label>
+                    <div className="relative">
+                      <input
+                        type={showApiKey ? "text" : "password"}
+                        value={newApiKey}
+                        onChange={(e) => setNewApiKey(e.target.value)}
+                        placeholder="sk-..."
+                        className="w-full px-4 py-2 pr-10 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white font-mono text-sm focus:ring-2 focus:ring-primary-500"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setShowApiKey(!showApiKey)}
+                        className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                      >
+                        {showApiKey ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                      </button>
+                    </div>
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                      모델
+                    </label>
+                    <select
+                      value={newModel}
+                      onChange={(e) => setNewModel(e.target.value)}
+                      className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:ring-2 focus:ring-primary-500"
+                    >
+                      <option value="gpt-4o-mini">GPT-4o Mini (추천, 저렴)</option>
+                      <option value="gpt-4o">GPT-4o (고품질)</option>
+                      <option value="gpt-4-turbo">GPT-4 Turbo</option>
+                      <option value="gpt-3.5-turbo">GPT-3.5 Turbo (가장 저렴)</option>
+                    </select>
+                  </div>
+                  <div className="flex gap-2">
+                    <Button
+                      onClick={validateLlmKey}
+                      disabled={keyValidating || !newApiKey}
+                      variant="outline"
+                    >
+                      <ShieldCheck className="w-4 h-4 mr-1.5" />
+                      {keyValidating ? "검증 중..." : "키 검증"}
+                    </Button>
+                    <Button
+                      onClick={saveLlmKey}
+                      disabled={keySaving || !newApiKey}
+                      variant="primary"
+                    >
+                      {keySaving ? "저장 중..." : "저장"}
+                    </Button>
+                    {showKeyInput && llmKey && (
+                      <Button
+                        onClick={() => { setShowKeyInput(false); setNewApiKey(""); }}
+                        variant="ghost"
+                      >
+                        취소
+                      </Button>
+                    )}
+                  </div>
+                  <p className="text-xs text-gray-500 dark:text-gray-400">
+                    🔒 API 키는 암호화되어 저장되며, 서버 관리자도 원본 키를 볼 수 없습니다.
+                  </p>
+                </div>
+              )}
             </div>
           </Card>
 

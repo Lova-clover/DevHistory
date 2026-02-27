@@ -16,6 +16,8 @@ class StyleProfile(Base):
     blog_structure = Column(JSONB, nullable=False, default=list)  # ['Intro','Problem','Approach','Result','Next']
     report_structure = Column(JSONB, nullable=False, default=list)  # ['Summary','What I did','Learned','Next']
     extra_instructions = Column(Text)  # Additional instructions for LLM
+    learned_style_prompt = Column(Text)  # Auto-learned writing style from Velog posts
+    learned_at = Column(DateTime(timezone=True))  # When style was last learned
     created_at = Column(DateTime(timezone=True), nullable=False, default=datetime.utcnow)
     updated_at = Column(DateTime(timezone=True), nullable=False, default=datetime.utcnow, onupdate=datetime.utcnow)
     

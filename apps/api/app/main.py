@@ -5,6 +5,8 @@ from app.routers import auth, me, profile, collector, dashboard, weekly, repos, 
 from app.routers import public
 from app.routers import llm as llm_router
 from app.routers import analytics as analytics_router
+from app.routers import coach as coach_router
+from app.routers import resume as resume_router
 
 app = FastAPI(
     title="AutoMerge API",
@@ -34,6 +36,8 @@ app.include_router(charts.router, prefix="/api/charts", tags=["charts"])
 app.include_router(public.router, prefix="/api/public", tags=["public"])
 app.include_router(llm_router.router, prefix="/api/me/llm", tags=["llm"])
 app.include_router(analytics_router.router, prefix="/api/analytics", tags=["analytics"])
+app.include_router(coach_router.router, prefix="/api/coach", tags=["coach"])
+app.include_router(resume_router.router, prefix="/api/resume", tags=["resume"])
 
 
 @app.get("/")

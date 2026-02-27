@@ -114,6 +114,8 @@ async def get_style_profile(
         "blog_structure": style.blog_structure,
         "report_structure": style.report_structure,
         "extra_instructions": style.extra_instructions,
+        "learned_style_prompt": style.learned_style_prompt,
+        "learned_at": style.learned_at.isoformat() if style.learned_at else None,
     }
 
 
@@ -151,4 +153,65 @@ async def update_style_profile(
         "blog_structure": style.blog_structure,
         "report_structure": style.report_structure,
         "extra_instructions": style.extra_instructions,
+        "learned_style_prompt": style.learned_style_prompt,
+        "learned_at": style.learned_at.isoformat() if style.learned_at else None,
     }
+
+
+class LearnedStyleUpdate(BaseModel):
+    learned_style_prompt: str
+
+
+@router.post("/style/learn")
+async def learn_writing_style(
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """Trigger Velog style analysis. Returns immediately — analysis runs in background."""
+    from app.models.user_profile import UserProfile as UP
+    profile = db.query(UP).filter(UP.user_id == current_user.id).first()
+    if not profile or not profile.velog_id:
+        from fastapi import HTTPException
+        raise HTTPException(400, "Velog ID를 먼저 설정해주세요")
+
+    from worker.tasks.forge_llm import learn_velog_style
+    task = learn_velog_style.delay(str(current_user.id))
+
+    # Wait for result with timeout  
+    import time
+    max_wait = 30
+    start = time.time()
+    while time.time() - start < max_wait:
+        if task.ready():
+            result = task.get()
+            if result.get("status") == "success":
+                return {"status": "success", "learned_style_prompt": result.get("learned_prompt")}
+            return {"status": "error", "error": result.get("error", "Unknown error")}
+        time.sleep(0.5)
+
+    return {"status": "processing", "message": "스타일 분석이 진행 중입니다. 잠시 후 다시 확인해주세요."}
+
+
+@router.put("/style/learned-prompt")
+async def update_learned_prompt(
+    data: LearnedStyleUpdate,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """Update the learned style prompt (user can edit it)."""
+    style = db.query(StyleProfile).filter(StyleProfile.user_id == current_user.id).first()
+    if not style:
+        style = StyleProfile(
+            user_id=current_user.id,
+            language="ko",
+            tone="technical",
+            blog_structure=["Intro", "Problem", "Approach", "Result", "Next"],
+            report_structure=["Summary", "What I did", "Learned", "Next"],
+        )
+        db.add(style)
+    
+    style.learned_style_prompt = data.learned_style_prompt
+    db.commit()
+    db.refresh(style)
+    
+    return {"learned_style_prompt": style.learned_style_prompt}
