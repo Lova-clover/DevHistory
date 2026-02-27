@@ -123,3 +123,27 @@ async def validate_llm_key(
         return {"valid": True}
     except Exception as e:
         return {"valid": False, "error": str(e)}
+
+
+@router.post("/test", response_model=LlmKeyValidateResponse)
+async def test_stored_key(
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """Test the user's already-stored API key by making a minimal API call."""
+    cred = db.query(LlmCredential).filter(LlmCredential.user_id == current_user.id).first()
+    if not cred or not cred.encrypted_api_key:
+        raise HTTPException(404, "No API key stored. Save a key first.")
+    try:
+        from openai import OpenAI
+
+        api_key = decrypt_value(cred.encrypted_api_key)
+        client = OpenAI(api_key=api_key)
+        client.models.list()
+
+        cred.last_verified_at = datetime.utcnow()
+        db.commit()
+
+        return {"valid": True}
+    except Exception as e:
+        return {"valid": False, "error": str(e)}

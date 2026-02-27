@@ -24,6 +24,7 @@ COPY --from=builder /usr/local/bin /usr/local/bin
 
 COPY apps/api /app/apps/api
 COPY packages  /app/packages
+COPY infra     /app/infra
 COPY pyproject.toml /app/pyproject.toml
 
 ENV PYTHONPATH=/app/apps/api:/app/packages:$PYTHONPATH

@@ -1,15 +1,17 @@
 """Analytics event ingestion and admin metrics."""
 import hashlib
+import uuid
 from datetime import datetime, timedelta
 from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Request
+from fastapi.responses import Response
 from pydantic import BaseModel
 from sqlalchemy import func, cast, Date
 from sqlalchemy.orm import Session
 
 from app.database import get_db
-from app.deps import get_current_user
+from app.deps import get_current_user, get_current_user_optional
 from app.models.analytics_event import AnalyticsEvent
 from app.models.user import User
 from app.config import settings
@@ -32,25 +34,39 @@ def _hash_ip(ip: str) -> str:
     return hashlib.sha256(f"{salt}:{ip}".encode()).hexdigest()[:16]
 
 
+def _get_client_ip(request: Request) -> str:
+    """Extract real client IP behind reverse proxy (Caddy / nginx)."""
+    forwarded = request.headers.get("x-forwarded-for")
+    if forwarded:
+        # First value is the original client
+        return forwarded.split(",")[0].strip()
+    return request.client.host if request.client else "unknown"
+
+
 @router.post("/event", status_code=204)
 async def track_event(
     data: EventCreate,
     request: Request,
+    response: Response,
     db: Session = Depends(get_db),
+    current_user: Optional[User] = Depends(get_current_user_optional),
 ):
     """Record an analytics event (anonymous or authenticated)."""
-    # Try to get user from cookie (don't fail if not authed)
-    user_id = None
-    try:
-        from app.deps import get_current_user_optional
-        user_id = None  # Will add optional dep later
-    except ImportError:
-        pass
+    user_id = str(current_user.id) if current_user else None
 
-    # Extract session id from cookie if present
+    # Session cookie: read existing or generate new
     session_id = request.cookies.get("_dh_sid")
+    if not session_id:
+        session_id = uuid.uuid4().hex
+        response.set_cookie(
+            "_dh_sid",
+            session_id,
+            max_age=60 * 60 * 24 * 30,  # 30 days
+            httponly=False,
+            samesite="lax",
+        )
 
-    ip = request.client.host if request.client else "unknown"
+    ip = _get_client_ip(request)
 
     event = AnalyticsEvent(
         event_name=data.event_name,
@@ -64,7 +80,6 @@ async def track_event(
     )
     db.add(event)
     db.commit()
-    return None
 
 
 # ── Admin Guard ──────────────────────────────────────────────────

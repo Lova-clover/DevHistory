@@ -4,6 +4,7 @@ import "./globals.css";
 import { ToastProvider } from "@/components/ui/toast";
 import { ThemeProvider } from "@/components/theme-provider";
 import { ThemeToggle } from "@/components/ui/theme-toggle";
+import { AnalyticsTracker } from "@/components/analytics-tracker";
 
 const inter = Inter({ subsets: ["latin"] });
 
@@ -53,6 +54,7 @@ export default function RootLayout({
               </div>
             </nav>
             <main className="min-h-screen bg-gray-50 dark:bg-gray-900">{children}</main>
+            <AnalyticsTracker />
           </ToastProvider>
         </ThemeProvider>
       </body>

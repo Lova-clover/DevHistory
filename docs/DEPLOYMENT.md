@@ -30,6 +30,7 @@ Edit `.env` and fill in all values:
 | `JWT_SECRET` | `python3 -c "import secrets; print(secrets.token_urlsafe(64))"` |
 | `CREDENTIALS_ENCRYPTION_KEY` | `python3 -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"` |
 | `GITHUB_CLIENT_ID` / `SECRET` | From your GitHub OAuth App |
+| `GITHUB_REDIRECT_URI` | `https://YOURDOMAIN/api/auth/github/callback` |
 | `OPENAI_API_KEY` | Optional (users can bring their own) |
 | `ADMIN_GITHUB_USERNAMES` | Your GitHub username |
 
