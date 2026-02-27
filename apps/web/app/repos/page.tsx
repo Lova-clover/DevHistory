@@ -9,6 +9,7 @@ import { Badge } from "@/components/ui/badge";
 import { EmptyState } from "@/components/ui/empty-state";
 import { Loading } from "@/components/ui/loading";
 import { fetchWithAuth } from "@/lib/api";
+import { trackEvent } from "@/lib/analytics";
 import { format } from "date-fns";
 import { ko } from "date-fns/locale";
 
@@ -83,7 +84,8 @@ export default function ReposPage() {
     setSyncing(true);
     try {
       await fetchWithAuth("/api/collector/trigger/github", { method: "POST" });
-      alert("GitHub 동기화를 시작했습니다");
+      trackEvent({ event_name: "sync_triggered", meta: { source: "github", content_type: "collector" } });
+      alert("현재 GitHub 동기화를 시작했습니다");
       fetchRepos();
     } catch (error) {
       alert("동기화 실행에 실패했습니다");

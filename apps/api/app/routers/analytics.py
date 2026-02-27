@@ -63,7 +63,10 @@ async def track_event(
             session_id,
             max_age=60 * 60 * 24 * 30,  # 30 days
             httponly=False,
+            secure=settings.COOKIE_SECURE,
             samesite="lax",
+            path="/",
+            domain=settings.COOKIE_DOMAIN or None,
         )
 
     ip = _get_client_ip(request)

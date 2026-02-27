@@ -108,3 +108,34 @@ docker compose -f infra/docker-compose.prod.yml restart caddy
 | HTTPS cert not issued | Port 80/443 blocked? DNS not pointing? | Check firewall, DNS A record |
 | Slow responses | `docker stats` – check memory/CPU | Increase VPS resources or worker count |
 | Database full | `docker compose exec db psql -c "SELECT pg_database_size('devhistory');"` | Clean old data or expand disk |
+
+---
+
+## File Cleanup Checklist
+
+> **Status**: `api-client.ts` has been removed. `lib/api.ts` (`fetchWithAuth`) is the single HTTP client.
+
+### Completed
+
+- [x] Identified duplicate HTTP client files (`lib/api.ts` vs `lib/api-client.ts`)
+- [x] Verified zero remaining imports of `api-client.ts` across all source files
+- [x] Deleted `apps/web/lib/api-client.ts`
+- [x] Confirmed all pages and components reference only `@/lib/api` (`fetchWithAuth`)
+
+### Conventions Going Forward
+
+| Rule | Detail |
+|------|--------|
+| **Single HTTP client** | `apps/web/lib/api.ts` exports `fetchWithAuth`. No other API wrappers. |
+| **Analytics helper** | `apps/web/lib/analytics.ts` exports `trackEvent`. All frontend events route through this. |
+| **Import style** | Always import as `import { fetchWithAuth } from "@/lib/api"` — never create local fetch wrappers. |
+| **New API routes** | Add them in `apps/api/app/routers/` and register in `main.py`. Frontend calls via `fetchWithAuth`. |
+| **Duplicate check** | Before creating a new utility under `lib/`, grep the project: `grep -r "from.*lib/" apps/web/` |
+
+### If a Future Duplicate Is Discovered
+
+1. List all imports of the duplicate file: `grep -r "api-client\|apiClient" apps/web/`
+2. Replace each import with `fetchWithAuth` from `@/lib/api`
+3. Remove the duplicate file
+4. Run build to verify: `cd apps/web && npm run build`
+5. Verify no 404 API calls in browser DevTools after deploy

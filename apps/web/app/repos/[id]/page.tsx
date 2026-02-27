@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
 import { fetchWithAuth } from "@/lib/api";
+import { trackEvent } from "@/lib/analytics";
 
 export default function RepoDetailPage() {
   const params = useParams();
@@ -37,6 +38,7 @@ export default function RepoDetailPage() {
         method: "POST",
       });
       const data = await res.json();
+      trackEvent({ event_name: "generate_repo_blog", meta: { repo_id: params.id, content_type: "repo_blog", source: "repo_detail" } });
       setGeneratedContent(data.content);
     } catch (error) {
       console.error("Failed to generate blog:", error);

@@ -12,6 +12,7 @@ import { EmptyState } from "@/components/ui/empty-state";
 import { format, startOfWeek, addDays, subWeeks, addWeeks } from "date-fns";
 import { ko } from "date-fns/locale";
 import { fetchWithAuth } from "@/lib/api";
+import { trackEvent } from "@/lib/analytics";
 
 interface WeeklyReport {
   id: string;
@@ -91,6 +92,7 @@ export default function WeeklyPage() {
         method: "POST",
       });
       const data = await res.json();
+      trackEvent({ event_name: "generate_weekly_report", meta: { content_type: "weekly_report", source: "weekly_list" } });
       alert("주간 리포트 생성을 시작했습니다. 잠시 후 생성된 콘텐츠 페이지에서 확인하세요.");
       // Refresh list after generation starts
       setTimeout(fetchWeeklies, 2000);

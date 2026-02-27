@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Tabs } from "@/components/ui/tabs";
 import { fetchWithAuth } from "@/lib/api";
+import { trackEvent } from "@/lib/analytics";
 import html2canvas from "html2canvas";
 import jsPDF from "jspdf";
 
@@ -253,6 +254,7 @@ export default function PortfolioPage() {
         body: JSON.stringify(updates),
       });
       const data = await res.json();
+      trackEvent({ event_name: "share_settings_updated", meta: { ...updates, source: "portfolio" } });
       setShareSettings(data);
     } catch (e) {
       console.error("Failed to update share settings:", e);

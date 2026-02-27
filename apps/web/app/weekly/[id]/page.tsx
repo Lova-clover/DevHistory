@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
 import { fetchWithAuth } from "@/lib/api";
+import { trackEvent } from "@/lib/analytics";
 
 export default function WeeklyDetailPage() {
   const params = useParams();
@@ -36,6 +37,7 @@ export default function WeeklyDetailPage() {
         method: "POST",
       });
       const data = await res.json();
+      trackEvent({ event_name: "generate_weekly_report", meta: { weekly_id: params.id, content_type: "weekly_report", source: "weekly_detail" } });
       setWeekly({ ...weekly, llm_summary: data.content });
     } catch (error) {
       console.error("Failed to generate report:", error);

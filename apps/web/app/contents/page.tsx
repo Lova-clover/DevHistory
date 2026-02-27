@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { fetchWithAuth } from "@/lib/api";
+import { trackEvent } from "@/lib/analytics";
 import Link from "next/link";
 
 interface GeneratedContent {
@@ -43,6 +44,7 @@ export default function ContentsPage() {
       await fetchWithAuth(`/api/generate/content/${id}`, {
         method: "DELETE",
       });
+      trackEvent({ event_name: "content_deleted", meta: { content_id: id } });
       setContents(contents.filter((c) => c.id !== id));
       if (selectedContent?.id === id) {
         setSelectedContent(null);

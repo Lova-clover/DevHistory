@@ -6,6 +6,7 @@ import { RefreshCw, Github, CheckCircle, XCircle, Clock } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { fetchWithAuth } from "@/lib/api";
+import { trackEvent } from "@/lib/analytics";
 
 const containerVariants = {
   hidden: { opacity: 0 },
@@ -102,6 +103,7 @@ export default function SettingsPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ source, force_full_sync: false }),
       });
+      trackEvent({ event_name: "sync_triggered", meta: { source, content_type: "collector" } });
       alert(`${getSourceName(source)} 동기화를 시작했습니다`);
       // Wait a bit then refresh status
       setTimeout(fetchSyncStatus, 2000);
