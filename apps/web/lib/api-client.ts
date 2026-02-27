@@ -1,4 +1,4 @@
-// API client with error handling and loading states
+// Unified API client – cookie-based auth (httpOnly Secure)
 'use client';
 
 import { useState, useCallback } from 'react';
@@ -15,7 +15,9 @@ export interface AsyncState<T> {
   error: ApiError | null;
 }
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
+// In production, same-origin via Caddy – no explicit base URL needed.
+// In dev, Next.js rewrites /api/* to the FastAPI backend.
+const API_BASE_URL = '';  // same-origin – all requests go to /api/*
 
 class ApiClient {
   private baseURL: string;
@@ -28,22 +30,15 @@ class ApiClient {
     endpoint: string,
     options: RequestInit = {}
   ): Promise<T> {
-    const url = `${this.baseURL}${endpoint}`;
+    const url = `${this.baseURL}/api${endpoint}`;
     
     const defaultHeaders: HeadersInit = {
       'Content-Type': 'application/json',
     };
 
-    // Get token from storage
-    if (typeof window !== 'undefined') {
-      const token = localStorage.getItem('access_token');
-      if (token) {
-        defaultHeaders['Authorization'] = `Bearer ${token}`;
-      }
-    }
-
     const config: RequestInit = {
       ...options,
+      credentials: 'include',  // sends httpOnly cookies automatically
       headers: {
         ...defaultHeaders,
         ...options.headers,
@@ -156,13 +151,12 @@ export function useAsync<T>() {
   return { ...state, execute, reset };
 }
 
-// Specific API endpoints
+// Specific API endpoints – paths are relative to /api/
 export const api = {
   // Auth
   auth: {
-    githubCallback: (code: string, state?: string) =>
-      apiClient.post('/auth/github/callback', { code, state }),
     getMe: () => apiClient.get('/auth/me'),
+    logout: () => apiClient.post('/auth/logout'),
   },
 
   // Collector
@@ -184,8 +178,8 @@ export const api = {
   repos: {
     list: (page = 1, pageSize = 20) =>
       apiClient.get(`/repos?page=${page}&page_size=${pageSize}`),
-    get: (repoId: number) => apiClient.get(`/repos/${repoId}`),
-    getCommits: (repoId: number, page = 1, pageSize = 20) =>
+    get: (repoId: string) => apiClient.get(`/repos/${repoId}`),
+    getCommits: (repoId: string, page = 1, pageSize = 20) =>
       apiClient.get(`/repos/${repoId}/commits?page=${page}&page_size=${pageSize}`),
     getStats: () => apiClient.get('/repos/stats'),
   },
@@ -198,10 +192,10 @@ export const api = {
       if (month) url += `&month=${month}`;
       return apiClient.get(url);
     },
-    get: (weeklyId: number) => apiClient.get(`/weekly/${weeklyId}`),
+    get: (weeklyId: string) => apiClient.get(`/weekly/${weeklyId}`),
     create: (startDate: string, endDate: string, regenerate = false) =>
       apiClient.post('/weekly', { start_date: startDate, end_date: endDate, regenerate }),
-    delete: (weeklyId: number) => apiClient.delete(`/weekly/${weeklyId}`),
+    delete: (weeklyId: string) => apiClient.delete(`/weekly/${weeklyId}`),
     getStats: () => apiClient.get('/weekly/stats/overview'),
   },
 
@@ -226,24 +220,47 @@ export const api = {
       }
       return apiClient.get(url);
     },
-    get: (contentId: number) => apiClient.get(`/generate/content/${contentId}`),
-    update: (contentId: number, data: { title?: string; content?: string; metadata?: any }) =>
+    get: (contentId: string) => apiClient.get(`/generate/content/${contentId}`),
+    update: (contentId: string, data: { title?: string; content?: string; metadata?: any }) =>
       apiClient.put(`/generate/content/${contentId}`, data),
-    regenerate: (contentId: number, newContext?: string, useStyleProfile = true) =>
+    regenerate: (contentId: string, newContext?: string, useStyleProfile = true) =>
       apiClient.post(`/generate/content/${contentId}/regenerate`, {
         content_id: contentId,
         new_context: newContext,
         use_style_profile: useStyleProfile,
       }),
-    delete: (contentId: number) => apiClient.delete(`/generate/content/${contentId}`),
+    delete: (contentId: string) => apiClient.delete(`/generate/content/${contentId}`),
     getStats: () => apiClient.get('/generate/stats'),
   },
 
   // Profile
   profile: {
-    get: () => apiClient.get('/profile'),
-    update: (data: any) => apiClient.put('/profile', data),
+    get: () => apiClient.get('/profile/user'),
+    update: (data: any) => apiClient.put('/profile/user', data),
     getStyleProfile: () => apiClient.get('/profile/style'),
     updateStyleProfile: (data: any) => apiClient.put('/profile/style', data),
+  },
+
+  // Share settings
+  share: {
+    getSettings: () => apiClient.get('/me/share-settings'),
+    updateSettings: (data: any) => apiClient.put('/me/share-settings', data),
+    rotateToken: () => apiClient.post('/me/share/rotate'),
+    deleteShare: () => apiClient.delete('/me/share'),
+  },
+
+  // LLM credentials (BYO key)
+  llm: {
+    get: () => apiClient.get('/me/llm'),
+    save: (data: { provider: string; api_key: string; model?: string }) =>
+      apiClient.put('/me/llm', data),
+    test: () => apiClient.post('/me/llm/test'),
+    delete: () => apiClient.delete('/me/llm'),
+  },
+
+  // Analytics (client-side event tracking)
+  analytics: {
+    track: (event_name: string, meta?: Record<string, any>) =>
+      apiClient.post('/analytics/event', { event_name, meta }),
   },
 };

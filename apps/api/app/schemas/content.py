@@ -46,16 +46,16 @@ class ContentGenerateRequest(BaseModel):
 
 class ContentResponse(BaseModel):
     """Generated content response"""
-    id: int
-    user_id: int
+    id: str
+    user_id: str
     content_type: str
     title: str
     content: str
     metadata: Optional[dict] = Field(default=None, description="Additional metadata")
     status: Literal["pending", "generating", "completed", "failed"]
-    error_message: Optional[str]
+    error_message: Optional[str] = None
     created_at: datetime
-    updated_at: datetime
+    updated_at: Optional[datetime] = None
     
     class Config:
         from_attributes = True
@@ -88,7 +88,6 @@ class ContentUpdateRequest(BaseModel):
 
 class ContentRegenerateRequest(BaseModel):
     """Content regeneration request"""
-    content_id: int = Field(..., gt=0)
     new_context: Optional[str] = Field(None, max_length=2000, description="New context for regeneration")
     use_style_profile: bool = Field(default=True)
 

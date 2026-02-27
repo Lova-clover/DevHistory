@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef } from "react";
 import { motion } from "framer-motion";
-import { Download, Share2, User, Code2, Award, BookOpen, Calendar, Github, Mail, ExternalLink } from "lucide-react";
+import { Download, Share2, User, Code2, Award, BookOpen, Calendar, Github, Mail, ExternalLink, Globe, Link2, Copy, Check, X, RefreshCw, Eye, EyeOff } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -76,6 +76,19 @@ export default function PortfolioPage() {
   const [loading, setLoading] = useState(true);
   const [exporting, setExporting] = useState(false);
   const portfolioRef = useRef<HTMLDivElement>(null);
+  const [showShareModal, setShowShareModal] = useState(false);
+  const [shareSettings, setShareSettings] = useState<{
+    portfolio_public: boolean;
+    public_slug: string | null;
+    portfolio_show_email: boolean;
+    share_token: string | null;
+    share_token_expires_at: string | null;
+    public_url: string | null;
+    share_url: string | null;
+  } | null>(null);
+  const [shareLoading, setShareLoading] = useState(false);
+  const [slugInput, setSlugInput] = useState("");
+  const [copied, setCopied] = useState<"public" | "private" | null>(null);
 
   useEffect(() => {
     fetchPortfolio();
@@ -214,9 +227,59 @@ export default function PortfolioPage() {
     }
   };
 
-  const handleShare = () => {
-    navigator.clipboard.writeText(window.location.href);
-    alert("포트폴리오 링크가 클립보드에 복사되었습니다!");
+  const handleShare = async () => {
+    setShowShareModal(true);
+    if (!shareSettings) {
+      setShareLoading(true);
+      try {
+        const res = await fetchWithAuth("/api/me/share-settings");
+        const data = await res.json();
+        setShareSettings(data);
+        setSlugInput(data.public_slug || "");
+      } catch (e) {
+        console.error("Failed to load share settings:", e);
+      } finally {
+        setShareLoading(false);
+      }
+    }
+  };
+
+  const updateShareSettings = async (updates: Record<string, unknown>) => {
+    setShareLoading(true);
+    try {
+      const res = await fetchWithAuth("/api/me/share-settings", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(updates),
+      });
+      const data = await res.json();
+      setShareSettings(data);
+    } catch (e) {
+      console.error("Failed to update share settings:", e);
+    } finally {
+      setShareLoading(false);
+    }
+  };
+
+  const rotateToken = async () => {
+    setShareLoading(true);
+    try {
+      const res = await fetchWithAuth("/api/me/share/rotate", { method: "POST" });
+      const data = await res.json();
+      setShareSettings(data);
+    } catch (e) {
+      console.error("Failed to rotate token:", e);
+    } finally {
+      setShareLoading(false);
+    }
+  };
+
+  const copyUrl = (type: "public" | "private") => {
+    const url = type === "public" ? shareSettings?.public_url : shareSettings?.share_url;
+    if (!url) return;
+    navigator.clipboard.writeText(`${window.location.origin}${url}`);
+    setCopied(type);
+    setTimeout(() => setCopied(null), 2000);
   };
 
   if (loading) {
@@ -533,6 +596,135 @@ export default function PortfolioPage() {
           )}
         </motion.div>
       </motion.div>
+
+      {/* Share Modal */}
+      {showShareModal && (
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4" onClick={() => setShowShareModal(false)}>
+          <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-xl max-w-lg w-full p-6 space-y-6" onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-center justify-between">
+              <h2 className="text-xl font-bold dark:text-white flex items-center gap-2">
+                <Share2 className="w-5 h-5" /> 포트폴리오 공유
+              </h2>
+              <button onClick={() => setShowShareModal(false)} className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-200">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {shareLoading && !shareSettings ? (
+              <div className="py-8 text-center">
+                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500 mx-auto" />
+              </div>
+            ) : shareSettings ? (
+              <div className="space-y-5">
+                {/* Public Portfolio */}
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <Globe className="w-4 h-4 text-green-500" />
+                      <span className="font-medium dark:text-white">공개 포트폴리오</span>
+                    </div>
+                    <button
+                      onClick={() => updateShareSettings({ portfolio_public: !shareSettings.portfolio_public })}
+                      disabled={shareLoading}
+                      className={`relative w-11 h-6 rounded-full transition-colors ${
+                        shareSettings.portfolio_public ? "bg-green-500" : "bg-gray-300 dark:bg-gray-600"
+                      }`}
+                    >
+                      <span className={`absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full transition-transform ${
+                        shareSettings.portfolio_public ? "translate-x-5" : ""
+                      }`} />
+                    </button>
+                  </div>
+
+                  {shareSettings.portfolio_public && (
+                    <div className="space-y-2 pl-6">
+                      <div className="flex items-center gap-2">
+                        <span className="text-sm text-gray-500 dark:text-gray-400 whitespace-nowrap">/u/</span>
+                        <input
+                          type="text"
+                          value={slugInput}
+                          onChange={(e) => setSlugInput(e.target.value.toLowerCase().replace(/[^a-z0-9_-]/g, ""))}
+                          placeholder="my-portfolio"
+                          className="flex-1 text-sm border rounded-lg px-3 py-1.5 dark:bg-gray-700 dark:border-gray-600 dark:text-white"
+                        />
+                        <Button
+                          size="sm"
+                          onClick={() => updateShareSettings({ public_slug: slugInput })}
+                          disabled={shareLoading || slugInput.length < 3}
+                        >
+                          저장
+                        </Button>
+                      </div>
+                      {shareSettings.public_url && (
+                        <div className="flex items-center gap-2">
+                          <code className="text-xs bg-gray-100 dark:bg-gray-700 px-2 py-1 rounded flex-1 truncate dark:text-gray-300">
+                            {window.location.origin}{shareSettings.public_url}
+                          </code>
+                          <button onClick={() => copyUrl("public")} className="text-gray-400 hover:text-blue-500">
+                            {copied === "public" ? <Check className="w-4 h-4 text-green-500" /> : <Copy className="w-4 h-4" />}
+                          </button>
+                        </div>
+                      )}
+                      <label className="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-400">
+                        <input
+                          type="checkbox"
+                          checked={shareSettings.portfolio_show_email}
+                          onChange={(e) => updateShareSettings({ portfolio_show_email: e.target.checked })}
+                          className="rounded"
+                        />
+                        이메일 공개
+                      </label>
+                    </div>
+                  )}
+                </div>
+
+                <hr className="dark:border-gray-700" />
+
+                {/* Private Share Link */}
+                <div className="space-y-3">
+                  <div className="flex items-center gap-2">
+                    <Link2 className="w-4 h-4 text-blue-500" />
+                    <span className="font-medium dark:text-white">비공개 공유 링크</span>
+                  </div>
+                  <p className="text-xs text-gray-500 dark:text-gray-400 pl-6">
+                    링크를 아는 사람만 접근할 수 있습니다. 검색엔진에 노출되지 않습니다.
+                  </p>
+                  {shareSettings.share_url ? (
+                    <div className="space-y-2 pl-6">
+                      <div className="flex items-center gap-2">
+                        <code className="text-xs bg-gray-100 dark:bg-gray-700 px-2 py-1 rounded flex-1 truncate dark:text-gray-300">
+                          {window.location.origin}{shareSettings.share_url}
+                        </code>
+                        <button onClick={() => copyUrl("private")} className="text-gray-400 hover:text-blue-500">
+                          {copied === "private" ? <Check className="w-4 h-4 text-green-500" /> : <Copy className="w-4 h-4" />}
+                        </button>
+                      </div>
+                      {shareSettings.share_token_expires_at && (
+                        <p className="text-xs text-amber-600 dark:text-amber-400">
+                          만료: {new Date(shareSettings.share_token_expires_at).toLocaleDateString("ko-KR")}
+                        </p>
+                      )}
+                      <button
+                        onClick={rotateToken}
+                        disabled={shareLoading}
+                        className="flex items-center gap-1 text-xs text-blue-500 hover:text-blue-600"
+                      >
+                        <RefreshCw className="w-3 h-3" /> 새 링크 생성
+                      </button>
+                    </div>
+                  ) : (
+                    <div className="pl-6">
+                      <Button size="sm" variant="secondary" onClick={rotateToken} disabled={shareLoading}>
+                        <Link2 className="w-4 h-4 mr-1" /> 공유 링크 생성
+                      </Button>
+                    </div>
+                  )}
+                </div>
+              </div>
+            ) : null}
+          </div>
+        </div>
+      )}
     </div>
   );
 }

@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { fetchWithAuth } from "@/lib/api";
 
 export default function OnboardingPage() {
   const [formData, setFormData] = useState({
@@ -14,7 +15,7 @@ export default function OnboardingPage() {
     e.preventDefault();
     
     // Update user profile
-    await fetch("/api/profile/user", {
+    await fetchWithAuth("/api/profile/user", {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -24,7 +25,7 @@ export default function OnboardingPage() {
     });
 
     // Update style profile
-    await fetch("/api/profile/style", {
+    await fetchWithAuth("/api/profile/style", {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({

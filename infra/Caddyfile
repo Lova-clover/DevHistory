@@ -1,0 +1,34 @@
+# Caddyfile – production reverse proxy
+# Caddy auto-provisions HTTPS via Let's Encrypt
+#
+# Set {$DOMAIN} via environment variable, e.g.:
+#   DOMAIN=devhistory.example.com docker compose -f docker-compose.prod.yml up
+
+{$DOMAIN:localhost} {
+    # ── API routes ──────────────────────────────────
+    handle /api/* {
+        reverse_proxy api:8000
+    }
+
+    # ── Everything else → Next.js ───────────────────
+    handle {
+        reverse_proxy web:3000
+    }
+
+    # ── Security headers ────────────────────────────
+    header {
+        Strict-Transport-Security "max-age=63072000; includeSubDomains; preload"
+        X-Content-Type-Options "nosniff"
+        X-Frame-Options "DENY"
+        Referrer-Policy "strict-origin-when-cross-origin"
+        -Server
+    }
+
+    # ── Logging ─────────────────────────────────────
+    log {
+        output file /data/access.log {
+            roll_size 10mb
+            roll_keep 5
+        }
+    }
+}

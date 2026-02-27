@@ -1,5 +1,5 @@
 """Generate repository blog post using LLM."""
-from typing import Any
+from typing import Any, Optional
 from merge_core.llm import generate_text
 
 
@@ -9,6 +9,8 @@ def generate_repo_blog(
     style_profile: Any,
     readme_content: str = "",
     commit_summary: str = "",
+    api_key: Optional[str] = None,
+    model: str = "gpt-4o-mini",
 ) -> str:
     """
     Generate blog post for a repository using LLM.
@@ -125,7 +127,7 @@ def generate_repo_blog(
 
 Markdown 형식으로 작성해주세요. 제목(#)부터 시작."""
     
-    return generate_text(system_prompt, user_prompt)
+    return generate_text(system_prompt, user_prompt, model=model, api_key=api_key)
 
 
 def _build_system_prompt(style_profile: Any, output_type: str) -> str:

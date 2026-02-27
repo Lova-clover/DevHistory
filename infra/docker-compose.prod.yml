@@ -1,0 +1,144 @@
+version: '3.8'
+
+# ============================================================
+# DevHistory – Production Docker Compose
+# ============================================================
+# Usage:
+#   cp .env.prod.example .env
+#   # Edit .env with real secrets
+#   docker compose -f infra/docker-compose.prod.yml up -d --build
+# ============================================================
+
+services:
+  # ── Reverse Proxy (Caddy – auto HTTPS) ────────────
+  caddy:
+    image: caddy:2-alpine
+    container_name: devhistory_caddy
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    environment:
+      DOMAIN: ${DOMAIN:-localhost}
+    depends_on:
+      - api
+      - web
+
+  # ── PostgreSQL ────────────────────────────────────
+  db:
+    image: postgres:15
+    container_name: devhistory_db
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-devhistory}
+      POSTGRES_USER: ${POSTGRES_USER:-devhistory}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-devhistory}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ── Redis ─────────────────────────────────────────
+  redis:
+    image: redis:7-alpine
+    container_name: devhistory_redis
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+
+  # ── FastAPI (gunicorn + uvicorn) ──────────────────
+  api:
+    build:
+      context: ..
+      dockerfile: infra/api.prod.Dockerfile
+    container_name: devhistory_api
+    restart: unless-stopped
+    environment:
+      DATABASE_URL: postgresql://${POSTGRES_USER:-devhistory}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB:-devhistory}
+      REDIS_URL: redis://redis:6379/0
+      JWT_SECRET: ${JWT_SECRET:?Set JWT_SECRET in .env}
+      GITHUB_CLIENT_ID: ${GITHUB_CLIENT_ID:?Set GITHUB_CLIENT_ID}
+      GITHUB_CLIENT_SECRET: ${GITHUB_CLIENT_SECRET:?Set GITHUB_CLIENT_SECRET}
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      FRONTEND_URL: https://${DOMAIN:-localhost}
+      COOKIE_DOMAIN: ${DOMAIN:-localhost}
+      COOKIE_SECURE: "true"
+      CREDENTIALS_ENCRYPTION_KEY: ${CREDENTIALS_ENCRYPTION_KEY:?Set CREDENTIALS_ENCRYPTION_KEY}
+      ADMIN_GITHUB_USERNAMES: ${ADMIN_GITHUB_USERNAMES:-}
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 20s
+
+  # ── Celery Worker ─────────────────────────────────
+  worker:
+    build:
+      context: ..
+      dockerfile: infra/api.prod.Dockerfile
+    container_name: devhistory_worker
+    restart: unless-stopped
+    environment:
+      DATABASE_URL: postgresql://${POSTGRES_USER:-devhistory}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB:-devhistory}
+      REDIS_URL: redis://redis:6379/0
+      GITHUB_CLIENT_ID: ${GITHUB_CLIENT_ID}
+      GITHUB_CLIENT_SECRET: ${GITHUB_CLIENT_SECRET}
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      CREDENTIALS_ENCRYPTION_KEY: ${CREDENTIALS_ENCRYPTION_KEY}
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    command: celery -A worker.celery_app worker --loglevel=info --concurrency=2
+
+  # ── Celery Beat (scheduler) ───────────────────────
+  beat:
+    build:
+      context: ..
+      dockerfile: infra/api.prod.Dockerfile
+    container_name: devhistory_beat
+    restart: unless-stopped
+    environment:
+      DATABASE_URL: postgresql://${POSTGRES_USER:-devhistory}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB:-devhistory}
+      REDIS_URL: redis://redis:6379/0
+      GITHUB_CLIENT_ID: ${GITHUB_CLIENT_ID}
+      GITHUB_CLIENT_SECRET: ${GITHUB_CLIENT_SECRET}
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    command: celery -A worker.celery_app beat --loglevel=info
+
+  # ── Next.js (production build) ────────────────────
+  web:
+    build:
+      context: ..
+      dockerfile: infra/web.prod.Dockerfile
+    container_name: devhistory_web
+    restart: unless-stopped
+    depends_on:
+      - api
+
+volumes:
+  postgres_data:
+  caddy_data:
+  caddy_config:

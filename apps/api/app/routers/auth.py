@@ -9,8 +9,24 @@ from app.database import get_db
 from app.config import settings
 from app.models.user import User
 from app.models.oauth_account import OAuthAccount
+from app.deps import get_current_user
 
 router = APIRouter()
+
+
+def _set_auth_cookie(response: Response, jwt_token: str) -> None:
+    """Set httpOnly secure auth cookie."""
+    max_age = settings.JWT_EXPIRE_DAYS * 24 * 60 * 60
+    response.set_cookie(
+        key="access_token",
+        value=jwt_token,
+        httponly=True,
+        secure=settings.COOKIE_SECURE,
+        samesite="lax",
+        path="/",
+        max_age=max_age,
+        domain=settings.COOKIE_DOMAIN or None,
+    )
 
 
 @router.get("/github/login")
@@ -27,7 +43,7 @@ async def github_login():
 
 @router.get("/github/callback")
 async def github_callback(code: str, db: Session = Depends(get_db)):
-    """Handle GitHub OAuth callback."""
+    """Handle GitHub OAuth callback. Sets httpOnly cookie and redirects."""
     # Exchange code for access token
     async with httpx.AsyncClient() as client:
         token_response = await client.post(
@@ -82,6 +98,8 @@ async def github_callback(code: str, db: Session = Depends(get_db)):
         if not email:
             email = f"{github_user['login']}@users.noreply.github.com"
     
+    github_username = github_user.get("login", "")
+    
     # Find or create user
     user = db.query(User).filter(User.email == email).first()
     if not user:
@@ -89,10 +107,19 @@ async def github_callback(code: str, db: Session = Depends(get_db)):
             email=email,
             name=github_user.get("name") or github_user["login"],
             avatar_url=github_user.get("avatar_url"),
+            github_username=github_username,
         )
         db.add(user)
         db.commit()
         db.refresh(user)
+    else:
+        # Update github_username and avatar if changed
+        if github_username and user.github_username != github_username:
+            user.github_username = github_username
+        if github_user.get("avatar_url") and user.avatar_url != github_user["avatar_url"]:
+            user.avatar_url = github_user["avatar_url"]
+        user.updated_at = datetime.utcnow()
+        db.commit()
     
     # Find or create OAuth account
     oauth_account = db.query(OAuthAccount).filter(
@@ -122,14 +149,34 @@ async def github_callback(code: str, db: Session = Depends(get_db)):
     }
     jwt_token = jwt.encode(jwt_payload, settings.JWT_SECRET, algorithm=settings.JWT_ALGORITHM)
     
-    # Redirect to frontend with token in URL (will be saved to localStorage)
-    response = RedirectResponse(url=f"{settings.FRONTEND_URL}/auth/callback?token={jwt_token}")
+    # Set httpOnly cookie and redirect (NO token in URL)
+    response = RedirectResponse(
+        url=f"{settings.FRONTEND_URL}/auth/callback",
+        status_code=302,
+    )
+    _set_auth_cookie(response, jwt_token)
     
     return response
 
 
+@router.get("/me")
+async def auth_me(current_user: User = Depends(get_current_user)):
+    """Check auth status. Returns current user if cookie is valid."""
+    return {
+        "id": str(current_user.id),
+        "email": current_user.email,
+        "name": current_user.name,
+        "avatar_url": current_user.avatar_url,
+        "github_username": current_user.github_username,
+    }
+
+
 @router.post("/logout")
 async def logout(response: Response):
-    """Logout user by clearing cookie."""
-    response.delete_cookie(key="access_token")
+    """Logout user by clearing httpOnly cookie."""
+    response.delete_cookie(
+        key="access_token",
+        path="/",
+        domain=settings.COOKIE_DOMAIN or None,
+    )
     return {"message": "Logged out successfully"}

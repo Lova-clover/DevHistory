@@ -10,6 +10,8 @@ from app.models.blog_post import BlogPost
 from app.models.note import Note
 from app.models.weekly_summary import WeeklySummary
 from app.models.generated_content import GeneratedContent
+from app.models.llm_credential import LlmCredential
+from app.models.analytics_event import AnalyticsEvent
 
 __all__ = [
     "User",
@@ -23,4 +25,6 @@ __all__ = [
     "Note",
     "WeeklySummary",
     "GeneratedContent",
+    "LlmCredential",
+    "AnalyticsEvent",
 ]

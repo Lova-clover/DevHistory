@@ -1,26 +1,16 @@
 "use client";
 
 import { useEffect } from "react";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useRouter } from "next/navigation";
 
 export default function AuthCallbackPage() {
   const router = useRouter();
-  const searchParams = useSearchParams();
 
   useEffect(() => {
-    const token = searchParams.get("token");
-    
-    if (token) {
-      // Save token to localStorage
-      localStorage.setItem("access_token", token);
-      
-      // Redirect to dashboard
-      router.push("/dashboard");
-    } else {
-      // No token, redirect to login
-      router.push("/login");
-    }
-  }, [searchParams, router]);
+    // Cookie is already set by the backend via Set-Cookie header.
+    // Just redirect to dashboard.
+    router.push("/dashboard");
+  }, [router]);
 
   return (
     <div className="flex items-center justify-center min-h-screen">

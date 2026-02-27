@@ -4,12 +4,12 @@ from typing import Optional
 import os
 
 
-def get_llm_client() -> OpenAI:
-    """Get OpenAI client."""
-    api_key = os.getenv("OPENAI_API_KEY")
-    if not api_key:
-        raise ValueError("OPENAI_API_KEY environment variable is not set")
-    return OpenAI(api_key=api_key)
+def get_llm_client(api_key: Optional[str] = None) -> OpenAI:
+    """Get OpenAI client. Uses provided key or falls back to env var."""
+    key = api_key or os.getenv("OPENAI_API_KEY")
+    if not key:
+        raise ValueError("No OpenAI API key available (neither user key nor OPENAI_API_KEY env var)")
+    return OpenAI(api_key=key)
 
 
 def generate_text(
@@ -18,6 +18,7 @@ def generate_text(
     model: str = "gpt-4o-mini",
     temperature: float = 0.7,
     max_tokens: Optional[int] = None,
+    api_key: Optional[str] = None,
 ) -> str:
     """
     Generate text using OpenAI API.
@@ -28,11 +29,12 @@ def generate_text(
         model: Model name
         temperature: Sampling temperature
         max_tokens: Maximum tokens to generate
+        api_key: Optional user-provided API key (BYO LLM)
         
     Returns:
         Generated text content
     """
-    client = get_llm_client()
+    client = get_llm_client(api_key=api_key)
     
     messages = [
         {"role": "system", "content": system_prompt},

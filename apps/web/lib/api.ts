@@ -1,29 +1,17 @@
-// API client with authentication
+// API client with cookie-based authentication
+// All auth is handled via httpOnly Secure cookies (no localStorage tokens)
+
 export async function fetchWithAuth(url: string, options: RequestInit = {}) {
-  const token = typeof window !== 'undefined' ? localStorage.getItem('access_token') : null;
-  
-  const headers: HeadersInit = {
-    ...options.headers,
-  };
-  
-  if (token) {
-    headers['Authorization'] = `Bearer ${token}`;
-  }
-  
   return fetch(url, {
     ...options,
-    headers,
-    credentials: 'include',
+    headers: {
+      ...options.headers,
+    },
+    credentials: 'include',  // sends httpOnly cookies automatically
   });
 }
 
-export function getAuthToken(): string | null {
-  if (typeof window === 'undefined') return null;
-  return localStorage.getItem('access_token');
-}
-
-export function clearAuthToken() {
-  if (typeof window !== 'undefined') {
-    localStorage.removeItem('access_token');
-  }
+export async function logout() {
+  await fetch('/api/auth/logout', { method: 'POST', credentials: 'include' });
+  window.location.href = '/';
 }

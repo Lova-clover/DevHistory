@@ -1,5 +1,5 @@
 """Generate weekly report using LLM."""
-from typing import Any, Dict
+from typing import Any, Dict, Optional
 from merge_core.llm import generate_text
 
 
@@ -7,6 +7,8 @@ def generate_weekly_report(
     user: Any,
     weekly_summary: Any,
     style_profile: Any,
+    api_key: Optional[str] = None,
+    model: str = "gpt-4o-mini",
 ) -> str:
     """
     Generate weekly report content using LLM.
@@ -45,7 +47,7 @@ def generate_weekly_report(
 - Markdown 형식으로 작성
 """
     
-    return generate_text(system_prompt, user_prompt)
+    return generate_text(system_prompt, user_prompt, model=model, api_key=api_key)
 
 
 def _build_system_prompt(style_profile: Any, output_type: str) -> str:

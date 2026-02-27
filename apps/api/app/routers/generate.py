@@ -65,67 +65,13 @@ async def get_generated_contents(
     
     return [{
         "id": str(content.id),
-        "type": content.type,
+        "type": content.content_type,
         "source_ref": content.source_ref,
         "title": content.title,
         "content": content.content,
+        "status": content.status,
         "created_at": content.created_at.isoformat()
     } for content in contents]
-
-
-@router.put("/content/{content_id}")
-async def update_generated_content(
-    content_id: UUID,
-    update_data: dict,
-    current_user: User = Depends(get_current_user),
-    db: Session = Depends(get_db)
-):
-    """Update generated content."""
-    content = db.query(GeneratedContent).filter(
-        GeneratedContent.id == content_id,
-        GeneratedContent.user_id == current_user.id
-    ).first()
-    
-    if not content:
-        raise HTTPException(status_code=404, detail="Content not found")
-    
-    if "content" in update_data:
-        content.content = update_data["content"]
-    if "title" in update_data:
-        content.title = update_data["title"]
-    
-    db.commit()
-    db.refresh(content)
-    
-    return {
-        "id": str(content.id),
-        "type": content.type,
-        "source_ref": content.source_ref,
-        "title": content.title,
-        "content": content.content,
-        "created_at": content.created_at.isoformat()
-    }
-
-
-@router.delete("/content/{content_id}")
-async def delete_generated_content(
-    content_id: UUID,
-    current_user: User = Depends(get_current_user),
-    db: Session = Depends(get_db)
-):
-    """Delete generated content."""
-    content = db.query(GeneratedContent).filter(
-        GeneratedContent.id == content_id,
-        GeneratedContent.user_id == current_user.id
-    ).first()
-    
-    if not content:
-        raise HTTPException(status_code=404, detail="Content not found")
-    
-    db.delete(content)
-    db.commit()
-    
-    return {"message": "Content deleted successfully"}
 
 
 @router.get("/content", response_model=ContentListResponse)
@@ -235,7 +181,7 @@ async def generate_repo_blog(
 
 @router.put("/content/{content_id}", response_model=ContentResponse)
 async def update_content(
-    content_id: int,
+    content_id: UUID,
     request: ContentUpdateRequest,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
@@ -265,7 +211,7 @@ async def update_content(
 
 @router.post("/content/{content_id}/regenerate", response_model=ContentResponse)
 async def regenerate_content(
-    content_id: int,
+    content_id: UUID,
     request: ContentRegenerateRequest,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
@@ -299,7 +245,7 @@ async def regenerate_content(
 
 @router.get("/content/{content_id}", response_model=ContentResponse)
 async def get_content(
-    content_id: int,
+    content_id: UUID,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
@@ -317,7 +263,7 @@ async def get_content(
 
 @router.delete("/content/{content_id}")
 async def delete_content(
-    content_id: int,
+    content_id: UUID,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
