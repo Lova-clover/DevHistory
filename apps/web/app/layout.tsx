@@ -12,7 +12,7 @@ const inter = Inter({ subsets: ["latin"] });
 export const metadata: Metadata = {
   title: "DevHistory - 개발 활동 자동 머지 플랫폼",
   description: "GitHub, solved.ac, 노트를 자동 수집해서 포트폴리오로 만들어주는 서비스",
-  metadataBase: new URL("https://devhistory.com"),
+  metadataBase: new URL("https://devhistory.kr"),
   icons: {
     icon: "/devhistory_logo.png",
     apple: "/devhistory_logo.png",
@@ -20,7 +20,7 @@ export const metadata: Metadata = {
   openGraph: {
     title: "DevHistory - 개발 활동 자동 머지 플랫폼",
     description: "GitHub, solved.ac, 노트를 자동 수집해서 포트폴리오로 만들어주는 서비스",
-    url: "https://devhistory.com",
+    url: "https://devhistory.kr",
     siteName: "DevHistory",
     images: [{ url: "/devhistory_logo.png", width: 512, height: 512 }],
     locale: "ko_KR",

@@ -9,10 +9,13 @@
     handle /health {
         reverse_proxy api:8000
     }
-    handle /docs {
+    handle /docs* {
         reverse_proxy api:8000
     }
     handle /openapi.json {
+        reverse_proxy api:8000
+    }
+    handle /redoc* {
         reverse_proxy api:8000
     }
 
