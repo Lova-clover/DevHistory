@@ -2,7 +2,7 @@
 # Caddy auto-provisions HTTPS via Let's Encrypt
 #
 # Set {$DOMAIN} via environment variable, e.g.:
-#   DOMAIN=devhistory.example.com docker compose -f docker-compose.prod.yml up
+#   DOMAIN=devhistory.com docker compose -f docker-compose.prod.yml up
 
 {$DOMAIN:localhost} {
     # ── Health / docs – direct to API ───────────────

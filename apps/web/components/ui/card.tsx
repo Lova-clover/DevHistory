@@ -28,7 +28,7 @@ export function Card({
   return (
     <div
       className={`
-        bg-white rounded-xl border border-gray-200 shadow-sm
+        bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 shadow-sm
         transition-all duration-200
         ${paddingClasses[padding]}
         ${hoverClass}
@@ -44,7 +44,7 @@ export function Card({
 
 export function CardHeader({ children, className = '' }: React.HTMLAttributes<HTMLDivElement>) {
   return (
-    <div className={`border-b border-gray-200 pb-4 mb-4 ${className}`}>
+    <div className={`border-b border-gray-200 dark:border-gray-700 pb-4 mb-4 ${className}`}>
       {children}
     </div>
   );
@@ -52,7 +52,7 @@ export function CardHeader({ children, className = '' }: React.HTMLAttributes<HT
 
 export function CardTitle({ children, className = '' }: React.HTMLAttributes<HTMLHeadingElement>) {
   return (
-    <h3 className={`text-xl font-semibold text-gray-900 ${className}`}>
+    <h3 className={`text-xl font-semibold text-gray-900 dark:text-white ${className}`}>
       {children}
     </h3>
   );
@@ -60,7 +60,7 @@ export function CardTitle({ children, className = '' }: React.HTMLAttributes<HTM
 
 export function CardDescription({ children, className = '' }: React.HTMLAttributes<HTMLParagraphElement>) {
   return (
-    <p className={`text-sm text-gray-600 mt-1 ${className}`}>
+    <p className={`text-sm text-gray-600 dark:text-gray-400 mt-1 ${className}`}>
       {children}
     </p>
   );
@@ -76,7 +76,7 @@ export function CardContent({ children, className = '' }: React.HTMLAttributes<H
 
 export function CardFooter({ children, className = '' }: React.HTMLAttributes<HTMLDivElement>) {
   return (
-    <div className={`border-t border-gray-200 pt-4 mt-4 ${className}`}>
+    <div className={`border-t border-gray-200 dark:border-gray-700 pt-4 mt-4 ${className}`}>
       {children}
     </div>
   );

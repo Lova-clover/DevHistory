@@ -223,7 +223,7 @@ export default function PublicPortfolioPage() {
                     )}
                     <div className="flex items-center gap-3 text-xs text-gray-500">
                       {repo.language && (
-                        <Badge variant="secondary" className="text-xs">
+                        <Badge variant="default" className="text-xs">
                           {repo.language}
                         </Badge>
                       )}

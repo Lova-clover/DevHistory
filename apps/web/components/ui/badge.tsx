@@ -6,9 +6,10 @@ interface BadgeProps {
   children: React.ReactNode;
   variant?: 'default' | 'success' | 'warning' | 'error' | 'info';
   size?: 'sm' | 'md' | 'lg';
+  className?: string;
 }
 
-export function Badge({ children, variant = 'default', size = 'md' }: BadgeProps) {
+export function Badge({ children, variant = 'default', size = 'md', className = '' }: BadgeProps) {
   const variants = {
     default: 'bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-200',
     success: 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200',
@@ -27,7 +28,7 @@ export function Badge({ children, variant = 'default', size = 'md' }: BadgeProps
     <motion.span
       initial={{ scale: 0.8, opacity: 0 }}
       animate={{ scale: 1, opacity: 1 }}
-      className={`inline-flex items-center font-medium rounded-full ${variants[variant]} ${sizes[size]}`}
+      className={`inline-flex items-center font-medium rounded-full ${variants[variant]} ${sizes[size]} ${className}`}
     >
       {children}
     </motion.span>
