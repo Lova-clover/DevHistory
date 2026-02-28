@@ -15,7 +15,9 @@ class GeneratedContent(Base):
     source_ref = Column(String, nullable=True)  # 'weekly:{id}', 'repo:{id}'
     title = Column(String)
     content = Column(Text, nullable=False, server_default="")
-    metadata = Column(JSONB, nullable=True)
+    # SQLAlchemy Declarative reserves the attribute name "metadata".
+    # Keep DB column name as "metadata" while using a safe Python attribute.
+    content_metadata = Column("metadata", JSONB, nullable=True)
     status = Column(String, nullable=False, server_default="completed")  # pending, generating, completed, failed
     error_message = Column(Text, nullable=True)
     created_at = Column(DateTime(timezone=True), nullable=False, default=datetime.utcnow)

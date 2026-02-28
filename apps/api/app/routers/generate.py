@@ -35,7 +35,7 @@ async def generate_content(
         title=request.title or f"Generated {request.content_type}",
         content="",  # Will be filled by worker
         status="pending",
-        metadata={
+        content_metadata={
             "context": request.context,
             "date_range_start": request.date_range_start.isoformat() if request.date_range_start else None,
             "date_range_end": request.date_range_end.isoformat() if request.date_range_end else None,
@@ -200,7 +200,7 @@ async def update_content(
     if request.content is not None:
         content.content = request.content
     if request.metadata is not None:
-        content.metadata = request.metadata
+        content.content_metadata = request.metadata
     
     content.updated_at = datetime.utcnow()
     db.commit()
@@ -227,10 +227,10 @@ async def regenerate_content(
     
     # Update context if provided
     if request.new_context:
-        if not content.metadata:
-            content.metadata = {}
-        content.metadata["context"] = request.new_context
-        content.metadata["use_style_profile"] = request.use_style_profile
+        if not content.content_metadata:
+            content.content_metadata = {}
+        content.content_metadata["context"] = request.new_context
+        content.content_metadata["use_style_profile"] = request.use_style_profile
     
     content.status = "pending"
     content.updated_at = datetime.utcnow()

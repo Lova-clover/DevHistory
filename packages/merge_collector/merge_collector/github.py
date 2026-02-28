@@ -44,6 +44,31 @@ async def sync_repos(user_id: str, access_token: str, db: Session) -> List[Dict[
             return response.json()
     
     repos = await retry_with_backoff(fetch_repos)
+
+    async def fetch_repo_watchers(client: httpx.AsyncClient, full_name: str, fallback: int = 0) -> int:
+        """Fetch true watcher count(subscribers) for a repo."""
+        await github_rate_limiter.acquire()
+        try:
+            response = await client.get(
+                f"https://api.github.com/repos/{full_name}",
+                headers={
+                    "Authorization": f"Bearer {access_token}",
+                    "Accept": "application/vnd.github.v3+json",
+                },
+            )
+            response.raise_for_status()
+            detail = response.json()
+            subscribers = detail.get("subscribers_count")
+            if subscribers is None:
+                return int(fallback or 0)
+            return int(subscribers)
+        except Exception as exc:
+            logger.warning(
+                "Failed to fetch watcher count for repo %s: %s",
+                full_name,
+                exc,
+            )
+            return int(fallback or 0)
     
     # Validate and upsert repos into database
     from app.models.repo import Repo
@@ -52,73 +77,81 @@ async def sync_repos(user_id: str, access_token: str, db: Session) -> List[Dict[
         raise DataValidationError("GitHub API returned invalid data format")
     
     synced_repos = []
-    for repo_data in repos:
-        # Validate required fields
-        if not all(key in repo_data for key in ["id", "full_name", "html_url"]):
-            logger.warning(f"Skipping repo with missing fields: {repo_data.get('id', 'unknown')}")
-            continue
-        # Check if repo exists
-        existing_repo = db.query(Repo).filter(
-            Repo.user_id == user_id,
-            Repo.provider_repo_id == str(repo_data["id"])
-        ).first()
-        
-        if existing_repo:
-            # Update existing repo
-            existing_repo.full_name = repo_data["full_name"]
-            existing_repo.html_url = repo_data["html_url"]
-            existing_repo.description = repo_data.get("description")
-            existing_repo.language = repo_data.get("language")
-            existing_repo.stars = repo_data.get("stargazers_count", 0)
-            existing_repo.forks = repo_data.get("forks_count", 0)
-            existing_repo.is_fork = repo_data.get("fork", False)
-            existing_repo.last_synced_at = datetime.utcnow()
-            # Update created_at from GitHub if available
-            if repo_data.get("created_at"):
-                try:
-                    existing_repo.created_at = datetime.fromisoformat(repo_data["created_at"].replace("Z", "+00:00"))
-                except (ValueError, AttributeError):
-                    pass
-            # Use GitHub's updated_at if available, otherwise use current time
-            if repo_data.get("updated_at"):
-                try:
-                    existing_repo.updated_at = datetime.fromisoformat(repo_data["updated_at"].replace("Z", "+00:00"))
-                except (ValueError, AttributeError):
-                    existing_repo.updated_at = datetime.utcnow()
-            synced_repos.append(existing_repo)
-        else:
-            # Create new repo - use GitHub's created_at and updated_at
-            created_at = datetime.utcnow()
-            updated_at = datetime.utcnow()
+    async with httpx.AsyncClient(timeout=15.0) as detail_client:
+        for repo_data in repos:
+            # Validate required fields
+            if not all(key in repo_data for key in ["id", "full_name", "html_url"]):
+                logger.warning(f"Skipping repo with missing fields: {repo_data.get('id', 'unknown')}")
+                continue
+            # Check if repo exists
+            existing_repo = db.query(Repo).filter(
+                Repo.user_id == user_id,
+                Repo.provider_repo_id == str(repo_data["id"])
+            ).first()
+
+            fallback_watchers = repo_data.get("watchers_count", 0)
+            watchers = repo_data.get("subscribers_count")
+            if watchers is None:
+                watchers = await fetch_repo_watchers(detail_client, repo_data["full_name"], fallback=fallback_watchers)
             
-            if repo_data.get("created_at"):
-                try:
-                    created_at = datetime.fromisoformat(repo_data["created_at"].replace("Z", "+00:00"))
-                except (ValueError, AttributeError):
-                    pass
-            
-            if repo_data.get("updated_at"):
-                try:
-                    updated_at = datetime.fromisoformat(repo_data["updated_at"].replace("Z", "+00:00"))
-                except (ValueError, AttributeError):
-                    pass
-            
-            new_repo = Repo(
-                user_id=user_id,
-                provider_repo_id=str(repo_data["id"]),
-                full_name=repo_data["full_name"],
-                html_url=repo_data["html_url"],
-                description=repo_data.get("description"),
-                language=repo_data.get("language"),
-                stars=repo_data.get("stargazers_count", 0),
-                forks=repo_data.get("forks_count", 0),
-                is_fork=repo_data.get("fork", False),
-                last_synced_at=datetime.utcnow(),
-                created_at=created_at,
-                updated_at=updated_at
-            )
-            db.add(new_repo)
-            synced_repos.append(new_repo)
+            if existing_repo:
+                # Update existing repo
+                existing_repo.full_name = repo_data["full_name"]
+                existing_repo.html_url = repo_data["html_url"]
+                existing_repo.description = repo_data.get("description")
+                existing_repo.language = repo_data.get("language")
+                existing_repo.stars = repo_data.get("stargazers_count", 0)
+                existing_repo.watchers = int(watchers or 0)
+                existing_repo.forks = repo_data.get("forks_count", 0)
+                existing_repo.is_fork = repo_data.get("fork", False)
+                existing_repo.last_synced_at = datetime.utcnow()
+                # Update created_at from GitHub if available
+                if repo_data.get("created_at"):
+                    try:
+                        existing_repo.created_at = datetime.fromisoformat(repo_data["created_at"].replace("Z", "+00:00"))
+                    except (ValueError, AttributeError):
+                        pass
+                # Use GitHub's updated_at if available, otherwise use current time
+                if repo_data.get("updated_at"):
+                    try:
+                        existing_repo.updated_at = datetime.fromisoformat(repo_data["updated_at"].replace("Z", "+00:00"))
+                    except (ValueError, AttributeError):
+                        existing_repo.updated_at = datetime.utcnow()
+                synced_repos.append(existing_repo)
+            else:
+                # Create new repo - use GitHub's created_at and updated_at
+                created_at = datetime.utcnow()
+                updated_at = datetime.utcnow()
+                
+                if repo_data.get("created_at"):
+                    try:
+                        created_at = datetime.fromisoformat(repo_data["created_at"].replace("Z", "+00:00"))
+                    except (ValueError, AttributeError):
+                        pass
+                
+                if repo_data.get("updated_at"):
+                    try:
+                        updated_at = datetime.fromisoformat(repo_data["updated_at"].replace("Z", "+00:00"))
+                    except (ValueError, AttributeError):
+                        pass
+                
+                new_repo = Repo(
+                    user_id=user_id,
+                    provider_repo_id=str(repo_data["id"]),
+                    full_name=repo_data["full_name"],
+                    html_url=repo_data["html_url"],
+                    description=repo_data.get("description"),
+                    language=repo_data.get("language"),
+                    stars=repo_data.get("stargazers_count", 0),
+                    watchers=int(watchers or 0),
+                    forks=repo_data.get("forks_count", 0),
+                    is_fork=repo_data.get("fork", False),
+                    last_synced_at=datetime.utcnow(),
+                    created_at=created_at,
+                    updated_at=updated_at
+                )
+                db.add(new_repo)
+                synced_repos.append(new_repo)
     
     db.commit()
     logger.info(f"Successfully synced {len(synced_repos)} repos for user {user_id}")

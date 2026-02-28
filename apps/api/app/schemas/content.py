@@ -1,7 +1,7 @@
 """
 Content generation related schemas
 """
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, Field, field_validator, ConfigDict
 from typing import Optional, Literal
 from datetime import datetime
 
@@ -51,14 +51,17 @@ class ContentResponse(BaseModel):
     content_type: str
     title: str
     content: str
-    metadata: Optional[dict] = Field(default=None, description="Additional metadata")
+    metadata: Optional[dict] = Field(
+        default=None,
+        description="Additional metadata",
+        validation_alias="content_metadata",
+    )
     status: Literal["pending", "generating", "completed", "failed"]
     error_message: Optional[str] = None
     created_at: datetime
     updated_at: Optional[datetime] = None
     
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True, populate_by_name=True)
 
 
 class ContentListResponse(BaseModel):

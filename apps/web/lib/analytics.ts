@@ -20,7 +20,7 @@ export function trackEvent(event: AnalyticsEvent): void {
     body: JSON.stringify({
       event_name: event.event_name,
       path: event.path ?? window.location.pathname,
-      referrer: event.referrer ?? document.referrer || null,
+      referrer: event.referrer ?? (document.referrer || null),
       meta: event.meta ?? null,
     }),
   }).catch(() => {

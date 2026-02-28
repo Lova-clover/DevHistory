@@ -4,6 +4,7 @@ from fastapi.responses import RedirectResponse
 from sqlalchemy.orm import Session
 from jose import jwt
 import httpx
+import logging
 
 from app.database import get_db
 from app.config import settings
@@ -12,6 +13,7 @@ from app.models.oauth_account import OAuthAccount
 from app.deps import get_current_user
 
 router = APIRouter()
+logger = logging.getLogger(__name__)
 
 
 def _set_auth_cookie(response: Response, jwt_token: str) -> None:
@@ -140,6 +142,13 @@ async def github_callback(code: str, db: Session = Depends(get_db)):
         db.add(oauth_account)
     
     db.commit()
+
+    # Queue GitHub sync on successful login (non-blocking for auth flow).
+    try:
+        from worker.tasks.sync_github import sync_github_for_user
+        sync_github_for_user.delay(str(user.id))
+    except Exception as exc:
+        logger.warning("Failed to queue GitHub sync for user %s: %s", user.id, exc)
     
     # Create JWT token
     expire = datetime.utcnow() + timedelta(days=settings.JWT_EXPIRE_DAYS)

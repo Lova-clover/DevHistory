@@ -17,6 +17,7 @@ class Repo(Base):
     description = Column(Text)
     language = Column(String)
     stars = Column(Integer, nullable=False, default=0)
+    watchers = Column(Integer, nullable=False, default=0)
     forks = Column(Integer, nullable=False, default=0)
     is_fork = Column(Boolean, nullable=False, default=False)
     last_synced_at = Column(DateTime(timezone=True))

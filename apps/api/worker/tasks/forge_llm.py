@@ -149,7 +149,7 @@ def generate_content_llm(user_id: str, content_id: str):
         db.commit()
 
         # Read metadata stored by the router
-        meta = content.metadata or {}
+        meta = content.content_metadata or {}
         context_text = meta.get("context") or ""
         use_style = meta.get("use_style_profile", True)
         date_start = meta.get("date_range_start")
@@ -403,7 +403,7 @@ def generate_coach_analysis(user_id: str):
             title="알고리즘 코칭 분석",
             content=analysis,
             status="completed",
-            metadata={"total_problems": total, "top_tags": dict(top_tags)},
+            content_metadata={"total_problems": total, "top_tags": dict(top_tags)},
         )
         db.add(content)
         db.commit()
@@ -467,7 +467,7 @@ def generate_coach_quiz(user_id: str, topic: str = ""):
             title=f"코딩 퀴즈 — {target}",
             content=quiz,
             status="completed",
-            metadata={"topic": target},
+            content_metadata={"topic": target},
         )
         db.add(content)
         db.commit()
@@ -593,7 +593,7 @@ GitHub 프로젝트 ({len(repos)}개):
             title="이력서" if resume_type == "resume" else "자기소개서",
             content=result,
             status="completed",
-            metadata={"resume_type": resume_type},
+            content_metadata={"resume_type": resume_type},
         )
         db.add(content)
         db.commit()

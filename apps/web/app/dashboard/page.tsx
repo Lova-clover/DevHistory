@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { motion } from "framer-motion";
-import { Activity, GitCommit, BookOpen, Calendar, TrendingUp, Award, Code2 } from "lucide-react";
+import { Activity, GitCommit, BookOpen, TrendingUp, Award, Code2 } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Loading } from "@/components/ui/loading";
 import { Badge } from "@/components/ui/badge";
@@ -91,7 +91,6 @@ export default function DashboardPage() {
   const stats = {
     totalCommits: summary?.total_commits || 0,
     totalRepos: summary?.repo_count || 0,
-    weeklyReports: summary?.weekly_report_count || 0,
     blogPosts: summary?.blog_count || 0,
     currentStreak: summary?.current_streak || 0,
     longestStreak: summary?.longest_streak || 0,
@@ -113,14 +112,6 @@ export default function DashboardPage() {
       color: "text-purple-600 dark:text-purple-400",
       bgColor: "bg-purple-50 dark:bg-purple-900/20",
       trend: weeklyTrend?.repo_diff ? `${weeklyTrend.repo_diff > 0 ? '+' : ''}${weeklyTrend.repo_diff}` : "0",
-    },
-    {
-      title: "주간 리포트",
-      value: stats.weeklyReports.toLocaleString(),
-      icon: Calendar,
-      color: "text-green-600 dark:text-green-400",
-      bgColor: "bg-green-50 dark:bg-green-900/20",
-      trend: weeklyTrend?.recent_weekly_count ? `이번 주 ${weeklyTrend.recent_weekly_count}개` : "이번 주 0개",
     },
     {
       title: "블로그 포스트",
@@ -164,9 +155,9 @@ export default function DashboardPage() {
         {/* Stats Grid */}
         <motion.div
           variants={itemVariants}
-          className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6"
+          className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6"
         >
-          {statCards.map((stat, index) => (
+          {statCards.map((stat) => (
             <motion.div
               key={stat.title}
               whileHover={{ scale: 1.02, y: -4 }}

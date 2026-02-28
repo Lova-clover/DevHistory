@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { motion } from "framer-motion";
-import { Search, RefreshCw, GitFork, Star, Eye, Code2, Calendar } from "lucide-react";
+import { Search, RefreshCw, GitFork, Star, Code2, Calendar } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -202,7 +202,7 @@ export default function ReposPage() {
             {/* Stats */}
             <motion.div
               variants={itemVariants}
-              className="grid grid-cols-1 md:grid-cols-4 gap-4"
+              className="grid grid-cols-1 md:grid-cols-3 gap-4"
             >
               <Card className="p-4 bg-gradient-to-br from-blue-50 to-indigo-50 dark:from-blue-900/20 dark:to-indigo-900/20">
                 <div className="flex items-center gap-3">
@@ -240,17 +240,6 @@ export default function ReposPage() {
                 </div>
               </Card>
 
-              <Card className="p-4 bg-gradient-to-br from-purple-50 to-pink-50 dark:from-purple-900/20 dark:to-pink-900/20">
-                <div className="flex items-center gap-3">
-                  <Eye className="w-8 h-8 text-purple-600 dark:text-purple-400" />
-                  <div>
-                    <p className="text-sm text-gray-600 dark:text-gray-400">총 조회</p>
-                    <p className="text-2xl font-bold text-gray-900 dark:text-white">
-                      {repos.reduce((acc, repo) => acc + (repo.watchers || 0), 0)}
-                    </p>
-                  </div>
-                </div>
-              </Card>
             </motion.div>
 
             {/* Repos Grid */}
@@ -298,10 +287,6 @@ export default function ReposPage() {
                           <div className="flex items-center gap-1">
                             <GitFork className="w-4 h-4" />
                             {repo.forks || 0}
-                          </div>
-                          <div className="flex items-center gap-1">
-                            <Eye className="w-4 h-4" />
-                            {repo.watchers || 0}
                           </div>
                         </div>
 

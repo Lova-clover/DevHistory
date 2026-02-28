@@ -25,6 +25,7 @@ class RepoResponse(BaseModel):
         from_attributes = True
 
 
+@router.get("")
 @router.get("/")
 async def list_repos(
     current_user: User = Depends(get_current_user),
@@ -45,7 +46,7 @@ async def list_repos(
             "language": repo.language,
             "stars": repo.stars,
             "forks": repo.forks,
-            "watchers": repo.stars,  # GitHub uses stars as watchers
+            "watchers": repo.watchers,
             "is_fork": repo.is_fork,
             "last_commit_at": repo.last_synced_at.isoformat() if repo.last_synced_at else None,
             "last_synced_at": repo.last_synced_at.isoformat() if repo.last_synced_at else None,
