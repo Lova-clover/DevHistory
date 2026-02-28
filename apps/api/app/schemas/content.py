@@ -4,6 +4,7 @@ Content generation related schemas
 from pydantic import BaseModel, Field, field_validator, ConfigDict
 from typing import Optional, Literal
 from datetime import datetime
+from uuid import UUID
 
 
 class ContentGenerateRequest(BaseModel):
@@ -46,10 +47,10 @@ class ContentGenerateRequest(BaseModel):
 
 class ContentResponse(BaseModel):
     """Generated content response"""
-    id: str
-    user_id: str
+    id: UUID
+    user_id: UUID
     content_type: str
-    title: str
+    title: Optional[str] = None
     content: str
     metadata: Optional[dict] = Field(
         default=None,
@@ -97,7 +98,7 @@ class ContentRegenerateRequest(BaseModel):
 
 class ContentFilterRequest(BaseModel):
     """Content filter request"""
-    content_type: Optional[Literal["blog_post", "portfolio", "summary", "report"]] = None
+    content_type: Optional[str] = None
     status: Optional[Literal["pending", "generating", "completed", "failed"]] = None
     start_date: Optional[datetime] = None
     end_date: Optional[datetime] = None

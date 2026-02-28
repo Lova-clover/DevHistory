@@ -5,6 +5,15 @@ import { useParams } from "next/navigation";
 import { fetchWithAuth } from "@/lib/api";
 import { trackEvent } from "@/lib/analytics";
 
+type GeneratedContentItem = {
+  id: string;
+  type: string;
+  source_ref: string;
+  status?: string;
+  content: string;
+  created_at: string;
+};
+
 export default function RepoDetailPage() {
   const params = useParams();
   const [repo, setRepo] = useState<any>(null);
@@ -39,7 +48,38 @@ export default function RepoDetailPage() {
       });
       const data = await res.json();
       trackEvent({ event_name: "generate_repo_blog", meta: { repo_id: params.id, content_type: "repo_blog", source: "repo_detail" } });
-      setGeneratedContent(data.content);
+      if (data?.content) {
+        setGeneratedContent(data.content);
+        return;
+      }
+
+      const sourceRef = `repo:${params.id}`;
+      const maxAttempts = 20;
+      for (let attempt = 0; attempt < maxAttempts; attempt += 1) {
+        const listRes = await fetchWithAuth("/api/generate/contents");
+        if (listRes.ok) {
+          const contents = (await listRes.json()) as GeneratedContentItem[];
+          const matched = contents
+            .filter(
+              (item) =>
+                item.type === "repo_blog" &&
+                item.source_ref === sourceRef &&
+                item.status === "completed" &&
+                item.content
+            )
+            .sort(
+              (a, b) =>
+                new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+            );
+          if (matched.length > 0) {
+            setGeneratedContent(matched[0].content);
+            return;
+          }
+        }
+        await new Promise((resolve) => setTimeout(resolve, 1500));
+      }
+
+      alert("생성이 진행 중입니다. 잠시 후 다시 확인해주세요.");
     } catch (error) {
       console.error("Failed to generate blog:", error);
       alert("블로그 생성에 실패했습니다");

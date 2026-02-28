@@ -83,7 +83,11 @@ export default function ReposPage() {
   const triggerSync = async () => {
     setSyncing(true);
     try {
-      await fetchWithAuth("/api/collector/trigger/github", { method: "POST" });
+      await fetchWithAuth("/api/collector/sync", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ source: "github", force_full_sync: false }),
+      });
       trackEvent({ event_name: "sync_triggered", meta: { source: "github", content_type: "collector" } });
       alert("현재 GitHub 동기화를 시작했습니다");
       fetchRepos();

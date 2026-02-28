@@ -14,7 +14,7 @@ from sqlalchemy import func
 
 
 @celery_app.task
-def build_weekly_summary(user_id: str, week_start_date: str):
+def build_weekly_summary(user_id: str, week_start_date: str, generate_report: bool = False):
     """Build weekly summary for a single user and week."""
     db = SessionLocal()
     try:
@@ -57,12 +57,13 @@ def build_weekly_summary(user_id: str, week_start_date: str):
         ).first()
         
         if existing:
-            existing.commit_count = len(commits)
-            existing.problem_count = len(problems)
-            existing.note_count = len(notes)
-            existing.summary_json = summary_json
+            summary = existing
+            summary.commit_count = len(commits)
+            summary.problem_count = len(problems)
+            summary.note_count = len(notes)
+            summary.summary_json = summary_json
         else:
-            new_summary = WeeklySummary(
+            summary = WeeklySummary(
                 user_id=user.id,
                 week_start=week_start,
                 week_end=week_end,
@@ -71,10 +72,23 @@ def build_weekly_summary(user_id: str, week_start_date: str):
                 note_count=len(notes),
                 summary_json=summary_json,
             )
-            db.add(new_summary)
-        
+            db.add(summary)
+
         db.commit()
-        return {"status": "success", "user_id": user_id, "week_start": week_start_date}
+        db.refresh(summary)
+
+        if generate_report:
+            from worker.tasks.forge_llm import generate_weekly_report_llm
+
+            generate_weekly_report_llm.delay(user_id, str(summary.id))
+
+        return {
+            "status": "success",
+            "user_id": user_id,
+            "week_start": week_start_date,
+            "weekly_id": str(summary.id),
+            "report_queued": generate_report,
+        }
     finally:
         db.close()
 

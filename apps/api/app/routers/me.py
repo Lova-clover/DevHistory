@@ -29,7 +29,12 @@ class UserResponse(BaseModel):
 @router.get("/", response_model=UserResponse)
 async def get_me(current_user: User = Depends(get_current_user)):
     """Get current user information."""
-    return current_user
+    return {
+        "id": str(current_user.id),
+        "email": current_user.email,
+        "name": current_user.name,
+        "avatar_url": current_user.avatar_url,
+    }
 
 
 @router.get("/connections")

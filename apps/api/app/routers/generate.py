@@ -123,11 +123,38 @@ async def generate_weekly_report(
     # Trigger LLM generation task
     from worker.tasks.forge_llm import generate_weekly_report_llm
     task = generate_weekly_report_llm.delay(str(current_user.id), str(weekly_id))
-    
+
+    # Wait for task completion with a short timeout to support direct UI rendering.
+    import time
+
+    max_wait = 30
+    start_time = time.time()
+    while time.time() - start_time < max_wait:
+        if task.ready():
+            result = task.get()
+            if result.get("status") == "success":
+                content_id = result.get("content_id")
+                content = None
+                if content_id:
+                    content = (
+                        db.query(GeneratedContent)
+                        .filter(GeneratedContent.id == content_id)
+                        .first()
+                    )
+                if content:
+                    return {
+                        "message": "Weekly report generated successfully",
+                        "content": content.content,
+                        "content_id": str(content.id),
+                        "status": "completed",
+                    }
+            break
+        time.sleep(0.5)
+
     return {
         "message": "Weekly report generation started",
         "task_id": task.id,
-        "status": "processing"
+        "status": "processing",
     }
 
 

@@ -60,11 +60,15 @@ def generate_weekly_report_llm(user_id: str, weekly_summary_id: str):
 
         from merge_forge.weekly_report import generate_weekly_report
         content = generate_weekly_report(user, weekly_summary, style_profile, api_key=api_key, model=model)
+
+        weekly_summary.llm_summary = content
+        weekly_summary.updated_at = datetime.utcnow()
         
         generated = GeneratedContent(
             user_id=user_id,
             content_type="weekly_report",
             source_ref=f"weekly:{weekly_summary_id}",
+            title=f"Weekly Report ({weekly_summary.week_start.isoformat()})",
             content=content,
             status="completed",
         )
