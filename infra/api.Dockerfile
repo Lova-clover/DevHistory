@@ -6,6 +6,8 @@ WORKDIR /app
 RUN apt-get update && apt-get install -y \
     gcc \
     postgresql-client \
+    fonts-noto-color-emoji \
+    fonts-noto-cjk \
     && rm -rf /var/lib/apt/lists/*
 
 # Copy pyproject.toml first for dependency caching
@@ -13,6 +15,9 @@ COPY pyproject.toml .
 
 # Install Python dependencies
 RUN pip install --no-cache-dir -e .
+
+# Install Playwright browser for server-side PDF rendering
+RUN python -m playwright install --with-deps chromium
 
 # Copy application code
 COPY apps/api /app/apps/api

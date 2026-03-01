@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useState, useEffect, useRef } from "react";
 import { motion } from "framer-motion";
@@ -114,116 +114,153 @@ export default function PortfolioPage() {
     { id: "activity", label: "활동", icon: Calendar },
   ];
 
+  const waitForVisualReadiness = async (target: HTMLElement) => {
+    try {
+      const fontsApi = (document as Document & { fonts?: FontFaceSet }).fonts;
+      if (fontsApi) {
+        await fontsApi.ready;
+        await Promise.allSettled([
+          fontsApi.load('16px "Apple Color Emoji"', "😀"),
+          fontsApi.load('16px "Segoe UI Emoji"', "😀"),
+          fontsApi.load('16px "Noto Color Emoji"', "😀"),
+        ]);
+      }
+    } catch {
+      // Ignore font readiness failures and continue.
+    }
+
+    const images = Array.from(target.querySelectorAll("img"));
+    await Promise.allSettled(
+      images.map(async (img) => {
+        if (!img.complete) {
+          await new Promise<void>((resolve) => {
+            const done = () => resolve();
+            img.addEventListener("load", done, { once: true });
+            img.addEventListener("error", done, { once: true });
+            window.setTimeout(done, 3000);
+          });
+        }
+        if ("decode" in img) {
+          try {
+            await img.decode();
+          } catch {
+            // Ignore decode errors for cross-origin or failed images.
+          }
+        }
+      })
+    );
+
+    await new Promise<void>((resolve) =>
+      requestAnimationFrame(() => requestAnimationFrame(() => resolve()))
+    );
+    await new Promise<void>((resolve) => window.setTimeout(resolve, 350));
+  };
+
+  const captureSectionToPdf = async (target: HTMLElement, pdf: jsPDF, isFirstPage: boolean) => {
+    await waitForVisualReadiness(target);
+
+    const canvas = await html2canvas(target, {
+      scale: 2,
+      useCORS: true,
+      logging: false,
+      backgroundColor: "#ffffff",
+      windowWidth: target.scrollWidth,
+      windowHeight: target.scrollHeight,
+    });
+
+    const pdfWidth = pdf.internal.pageSize.getWidth();
+    const pdfHeight = pdf.internal.pageSize.getHeight();
+    const ratio = pdfWidth / canvas.width;
+    const scaledHeight = canvas.height * ratio;
+
+    if (!isFirstPage) {
+      pdf.addPage();
+    }
+
+    let position = 0;
+    let firstSlice = true;
+
+    while (position < scaledHeight) {
+      if (!firstSlice) {
+        pdf.addPage();
+      }
+      firstSlice = false;
+
+      const sourceY = position / ratio;
+      const sourceHeight = Math.min(pdfHeight / ratio, canvas.height - sourceY);
+      const pageCanvas = document.createElement("canvas");
+      pageCanvas.width = canvas.width;
+      pageCanvas.height = sourceHeight;
+
+      const ctx = pageCanvas.getContext("2d");
+      if (!ctx) {
+        throw new Error("Failed to create canvas context");
+      }
+
+      ctx.drawImage(
+        canvas,
+        0,
+        sourceY,
+        canvas.width,
+        sourceHeight,
+        0,
+        0,
+        canvas.width,
+        sourceHeight
+      );
+
+      const pageImgData = pageCanvas.toDataURL("image/png");
+      const pageScaledHeight = sourceHeight * ratio;
+      pdf.addImage(pageImgData, "PNG", 0, 0, pdfWidth, pageScaledHeight, undefined, "FAST");
+
+      position += pdfHeight;
+    }
+  };
+
   const handleExport = async () => {
     if (!portfolioRef.current || exporting) return;
 
+    const target = portfolioRef.current;
+    const originalTab = activeTab;
+    const hiddenTargets = Array.from(target.querySelectorAll<HTMLElement>(".export-hide"));
+    const previousDisplays = hiddenTargets.map((el) => el.style.display);
+
+    hiddenTargets.forEach((el) => {
+      el.style.display = "none";
+    });
+
     try {
       setExporting(true);
-      
-      // Save current tab
-      const originalTab = activeTab;
-      
-      // Hide buttons and tabs during export
-      const buttons = portfolioRef.current.querySelectorAll('.export-hide');
-      buttons.forEach(btn => (btn as HTMLElement).style.display = 'none');
-
-      // Wait for initial render
-      await new Promise(resolve => setTimeout(resolve, 800));
-
-      // Create PDF
+      setShowShareModal(false);
       const pdf = new jsPDF({
-        orientation: 'portrait',
-        unit: 'mm',
-        format: 'a4',
+        orientation: "portrait",
+        unit: "mm",
+        format: "a4",
       });
 
-      const pdfWidth = pdf.internal.pageSize.getWidth();
-      const pdfHeight = pdf.internal.pageSize.getHeight();
-
-      // Capture each tab: overview, projects, skills
-      const tabsToCapture = ['overview', 'projects', 'skills'];
-      
-      for (let i = 0; i < tabsToCapture.length; i++) {
+      const tabsToCapture = ["overview", "projects", "skills"] as const;
+      for (let i = 0; i < tabsToCapture.length; i += 1) {
         const tabId = tabsToCapture[i];
-        
-        // Switch to the tab
         setActiveTab(tabId);
-        
-        // Wait for render and animations to complete
-        await new Promise(resolve => setTimeout(resolve, 1000));
-        
-        // Capture the portfolio content
-        const canvas = await html2canvas(portfolioRef.current, {
-          scale: 2,
-          useCORS: true,
-          logging: false,
-          backgroundColor: '#ffffff',
-          windowWidth: portfolioRef.current.scrollWidth,
-          windowHeight: portfolioRef.current.scrollHeight,
-        });
 
-        const imgData = canvas.toDataURL('image/png');
-        const imgWidth = canvas.width;
-        const imgHeight = canvas.height;
-        
-        // Calculate dimensions to fit on page width
-        const ratio = pdfWidth / imgWidth;
-        const scaledHeight = imgHeight * ratio;
-        
-        // Add new page if not the first tab
-        if (i > 0) {
-          pdf.addPage();
-        }
-        
-        // Split content across multiple pages if needed
-        let position = 0;
-        const pageHeight = pdfHeight;
-        
-        while (position < scaledHeight) {
-          if (position > 0) {
-            pdf.addPage();
-          }
-          
-          // Calculate the portion of the image for this page
-          const sourceY = position / ratio;
-          const sourceHeight = Math.min(pageHeight / ratio, imgHeight - sourceY);
-          
-          // Create a canvas for this page's content
-          const pageCanvas = document.createElement('canvas');
-          pageCanvas.width = imgWidth;
-          pageCanvas.height = sourceHeight;
-          
-          const ctx = pageCanvas.getContext('2d');
-          if (ctx) {
-            ctx.drawImage(
-              canvas,
-              0, sourceY,
-              imgWidth, sourceHeight,
-              0, 0,
-              imgWidth, sourceHeight
-            );
-            
-            const pageImgData = pageCanvas.toDataURL('image/png');
-            const pageScaledHeight = sourceHeight * ratio;
-            pdf.addImage(pageImgData, 'PNG', 0, 0, pdfWidth, pageScaledHeight);
-          }
-          
-          position += pageHeight;
-        }
+        await new Promise<void>((resolve) => window.setTimeout(resolve, 1200));
+        await captureSectionToPdf(target, pdf, i === 0);
       }
 
-      // Restore buttons and original tab
-      buttons.forEach(btn => (btn as HTMLElement).style.display = '');
-      setActiveTab(originalTab);
-      
-      // Download PDF
-      const fileName = `${portfolio?.user.name || 'portfolio'}_${new Date().toISOString().split('T')[0]}.pdf`;
+      const fileName = `${portfolio?.user.name || "portfolio"}_${new Date()
+        .toISOString()
+        .split("T")[0]}.pdf`;
       pdf.save(fileName);
 
+      trackEvent({ event_name: "portfolio_pdf_exported" });
     } catch (error) {
-      console.error('PDF 생성 실패:', error);
-      alert('PDF 생성에 실패했습니다. 다시 시도해주세요.');
+      console.error("PDF capture export failed:", error);
+      alert("PDF 생성에 실패했습니다. 다시 시도해주세요.");
     } finally {
+      hiddenTargets.forEach((el, idx) => {
+        el.style.display = previousDisplays[idx];
+      });
+      setActiveTab(originalTab);
       setExporting(false);
     }
   };
@@ -431,7 +468,7 @@ export default function PortfolioPage() {
         </motion.div>
 
         {/* Tabs */}
-        <motion.div variants={itemVariants}>
+        <motion.div variants={itemVariants} className="export-hide">
           <Tabs tabs={tabs} activeTab={activeTab} onChange={setActiveTab} />
         </motion.div>
 

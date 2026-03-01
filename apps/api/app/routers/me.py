@@ -1,5 +1,5 @@
 import secrets
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Response
 from sqlalchemy.orm import Session
 from sqlalchemy import func, desc
 from app.deps import get_current_user, get_db
@@ -12,6 +12,7 @@ from app.models.blog_post import BlogPost
 from pydantic import BaseModel
 from datetime import datetime, timedelta
 from typing import Optional
+from html import escape
 
 router = APIRouter()
 
@@ -188,6 +189,384 @@ async def get_portfolio(
 
 
 # ── Share Settings ───────────────────────────────────────────────
+
+def _fmt_date(value: str | None) -> str:
+    if not value:
+        return "-"
+    try:
+        return datetime.fromisoformat(value.replace("Z", "+00:00")).strftime("%Y-%m-%d")
+    except Exception:
+        return value
+
+
+def _render_portfolio_pdf_html(portfolio: dict) -> str:
+    user = portfolio.get("user", {})
+    stats = portfolio.get("stats", {})
+    languages = portfolio.get("languages", [])
+    top_repos = portfolio.get("top_repos", [])
+    recent_activity = portfolio.get("recent_activity", [])
+
+    user_name = escape(user.get("name") or "Unknown User")
+    user_email = escape(user.get("email") or "-")
+    user_bio = escape(user.get("bio") or "")
+    github_username = user.get("github_username") or ""
+    avatar_url = user.get("avatar_url") or ""
+    github_link = (
+        f"https://github.com/{escape(github_username)}" if github_username else ""
+    )
+
+    language_rows = "\n".join(
+        [
+            f"""
+            <tr>
+              <td>{escape(lang.get("name") or "-")}</td>
+              <td class="num">{lang.get("count") or 0}</td>
+            </tr>
+            """
+            for lang in languages
+        ]
+    ) or '<tr><td colspan="2" class="muted">No language data</td></tr>'
+
+    repo_cards = "\n".join(
+        [
+            f"""
+            <article class="repo-card">
+              <div class="repo-top">
+                <h3>{escape(repo.get("name") or "-")}</h3>
+                <span class="badge">★ {repo.get("stars") or 0}</span>
+              </div>
+              <p>{escape(repo.get("description") or "No description")}</p>
+              <div class="repo-meta">
+                <span>{escape(repo.get("language") or "-")}</span>
+                <span>Forks {repo.get("forks") or 0}</span>
+              </div>
+              <div class="repo-url">{escape(repo.get("html_url") or "")}</div>
+            </article>
+            """
+            for repo in top_repos
+        ]
+    ) or '<p class="muted">No repositories found.</p>'
+
+    activity_rows = "\n".join(
+        [
+            f"""
+            <tr>
+              <td>{_fmt_date(item.get("date"))}</td>
+              <td>{escape(item.get("repo_name") or "-")}</td>
+              <td>{escape(item.get("message") or "-")}</td>
+            </tr>
+            """
+            for item in recent_activity
+        ]
+    ) or '<tr><td colspan="3" class="muted">No recent activity</td></tr>'
+
+    github_row = (
+        f'<a href="{github_link}" target="_blank" rel="noopener noreferrer">{escape(github_link)}</a>'
+        if github_link
+        else "-"
+    )
+
+    avatar_html = (
+        f'<img src="{escape(avatar_url)}" alt="avatar" class="avatar" />'
+        if avatar_url
+        else f'<div class="avatar-fallback">{escape((user.get("name") or "U")[:1].upper())}</div>'
+    )
+
+    return f"""<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>DevHistory Portfolio</title>
+  <style>
+    @page {{
+      size: A4;
+      margin: 12mm;
+    }}
+    * {{
+      box-sizing: border-box;
+      -webkit-print-color-adjust: exact;
+      print-color-adjust: exact;
+    }}
+    body {{
+      margin: 0;
+      font-family: "Noto Sans KR", "Apple SD Gothic Neo", "Malgun Gothic", sans-serif;
+      color: #0f172a;
+      background: #ffffff;
+      font-size: 12px;
+      line-height: 1.45;
+    }}
+    .page {{
+      width: 100%;
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+    }}
+    .header {{
+      display: flex;
+      gap: 14px;
+      padding: 16px;
+      border: 1px solid #e2e8f0;
+      border-radius: 12px;
+      background: linear-gradient(180deg, #f8fafc 0%, #ffffff 100%);
+      break-inside: avoid;
+      page-break-inside: avoid;
+    }}
+    .avatar, .avatar-fallback {{
+      width: 88px;
+      height: 88px;
+      border-radius: 999px;
+      object-fit: cover;
+      flex: 0 0 auto;
+    }}
+    .avatar-fallback {{
+      display: grid;
+      place-items: center;
+      background: #1d4ed8;
+      color: white;
+      font-size: 34px;
+      font-weight: 700;
+    }}
+    .title h1 {{
+      margin: 0;
+      font-size: 24px;
+      line-height: 1.2;
+    }}
+    .title .sub {{
+      margin-top: 4px;
+      color: #334155;
+      font-size: 12px;
+    }}
+    .bio {{
+      margin-top: 8px;
+      color: #334155;
+      white-space: pre-wrap;
+    }}
+    .links {{
+      margin-top: 8px;
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+      color: #0f172a;
+    }}
+    .stats {{
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 10px;
+    }}
+    .stat {{
+      border: 1px solid #e2e8f0;
+      border-radius: 10px;
+      padding: 10px;
+      background: #fff;
+      break-inside: avoid;
+      page-break-inside: avoid;
+    }}
+    .stat .k {{
+      color: #475569;
+      font-size: 11px;
+    }}
+    .stat .v {{
+      margin-top: 4px;
+      font-size: 20px;
+      font-weight: 700;
+    }}
+    .section {{
+      border: 1px solid #e2e8f0;
+      border-radius: 12px;
+      padding: 14px;
+      break-inside: avoid;
+      page-break-inside: avoid;
+    }}
+    .section h2 {{
+      margin: 0 0 8px 0;
+      font-size: 15px;
+    }}
+    .grid-2 {{
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 12px;
+    }}
+    .repo-grid {{
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+    }}
+    .repo-card {{
+      border: 1px solid #e2e8f0;
+      border-radius: 10px;
+      padding: 10px;
+      break-inside: avoid;
+      page-break-inside: avoid;
+    }}
+    .repo-card h3 {{
+      margin: 0;
+      font-size: 13px;
+    }}
+    .repo-card p {{
+      margin: 7px 0;
+      color: #334155;
+      font-size: 11px;
+    }}
+    .repo-top {{
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 10px;
+    }}
+    .repo-meta {{
+      display: flex;
+      gap: 10px;
+      color: #475569;
+      font-size: 11px;
+    }}
+    .repo-url {{
+      margin-top: 6px;
+      font-size: 10px;
+      color: #1d4ed8;
+      word-break: break-all;
+    }}
+    .badge {{
+      border: 1px solid #fde68a;
+      background: #fef9c3;
+      color: #92400e;
+      border-radius: 999px;
+      padding: 2px 8px;
+      font-size: 10px;
+      white-space: nowrap;
+    }}
+    table {{
+      width: 100%;
+      border-collapse: collapse;
+    }}
+    th, td {{
+      padding: 7px 8px;
+      border-bottom: 1px solid #e2e8f0;
+      text-align: left;
+      vertical-align: top;
+      font-size: 11px;
+    }}
+    th {{
+      color: #475569;
+      font-weight: 600;
+      background: #f8fafc;
+    }}
+    .num {{
+      text-align: right;
+    }}
+    .muted {{
+      color: #64748b;
+    }}
+    .footer {{
+      color: #94a3b8;
+      font-size: 10px;
+      text-align: right;
+      margin-top: 2px;
+    }}
+  </style>
+</head>
+<body>
+  <main class="page">
+    <section class="header">
+      {avatar_html}
+      <div class="title">
+        <h1>{user_name}</h1>
+        <div class="sub">DevHistory Portfolio</div>
+        <div class="bio">{user_bio or " "}</div>
+        <div class="links">
+          <span><strong>Email:</strong> {user_email}</span>
+          <span><strong>GitHub:</strong> {github_row}</span>
+        </div>
+      </div>
+    </section>
+
+    <section class="stats">
+      <div class="stat"><div class="k">Repositories</div><div class="v">{stats.get("total_repos") or 0}</div></div>
+      <div class="stat"><div class="k">Total Commits</div><div class="v">{stats.get("total_commits") or 0}</div></div>
+      <div class="stat"><div class="k">Solved Problems</div><div class="v">{stats.get("total_problems") or 0}</div></div>
+      <div class="stat"><div class="k">Blog Posts</div><div class="v">{stats.get("total_blogs") or 0}</div></div>
+    </section>
+
+    <section class="section">
+      <h2>Top Projects</h2>
+      <div class="repo-grid">{repo_cards}</div>
+    </section>
+
+    <section class="grid-2">
+      <section class="section">
+        <h2>Languages</h2>
+        <table>
+          <thead><tr><th>Language</th><th class="num">Repos</th></tr></thead>
+          <tbody>{language_rows}</tbody>
+        </table>
+      </section>
+
+      <section class="section">
+        <h2>Activity Summary</h2>
+        <table>
+          <tbody>
+            <tr><th>Total Stars</th><td class="num">{stats.get("total_stars") or 0}</td></tr>
+            <tr><th>Active Days</th><td class="num">{stats.get("activity_days") or 0}</td></tr>
+            <tr><th>Recent 30d Commits</th><td class="num">{stats.get("recent_commits") or 0}</td></tr>
+          </tbody>
+        </table>
+      </section>
+    </section>
+
+    <section class="section">
+      <h2>Recent Activity</h2>
+      <table>
+        <thead><tr><th style="width:90px;">Date</th><th style="width:160px;">Repository</th><th>Message</th></tr></thead>
+        <tbody>{activity_rows}</tbody>
+      </table>
+    </section>
+
+    <div class="footer">Generated by DevHistory · {datetime.utcnow().strftime("%Y-%m-%d %H:%M UTC")}</div>
+  </main>
+</body>
+</html>"""
+
+
+@router.get("/portfolio/pdf")
+async def export_portfolio_pdf(
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """Generate and download portfolio PDF rendered by headless browser."""
+    portfolio = await get_portfolio(current_user=current_user, db=db)
+    html = _render_portfolio_pdf_html(portfolio)
+
+    try:
+        from playwright.async_api import async_playwright
+    except Exception:
+        raise HTTPException(
+            status_code=503,
+            detail="PDF renderer is not available. Install Playwright and Chromium browser.",
+        )
+
+    try:
+        async with async_playwright() as p:
+            browser = await p.chromium.launch(headless=True, args=["--no-sandbox"])
+            page = await browser.new_page(viewport={"width": 1440, "height": 2200})
+            await page.emulate_media(media="screen")
+            await page.set_content(html, wait_until="networkidle")
+            pdf_bytes = await page.pdf(
+                format="A4",
+                print_background=True,
+                prefer_css_page_size=True,
+                margin={"top": "12mm", "right": "12mm", "bottom": "12mm", "left": "12mm"},
+            )
+            await browser.close()
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"PDF generation failed: {str(e)}")
+
+    filename = "devhistory-portfolio.pdf"
+    return Response(
+        content=pdf_bytes,
+        media_type="application/pdf",
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+    )
+
 
 class ShareSettingsUpdate(BaseModel):
     portfolio_public: Optional[bool] = None

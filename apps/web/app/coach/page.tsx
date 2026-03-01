@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
@@ -106,6 +106,36 @@ export default function CoachPage() {
     }
   };
 
+  const pollQuizTask = async (taskId: string) => {
+    const maxAttempts = 40;
+    const delayMs = 3000;
+
+    for (let i = 0; i < maxAttempts; i += 1) {
+      await new Promise((resolve) => setTimeout(resolve, delayMs));
+
+      const res = await fetchWithAuth(`/api/coach/quiz/task/${encodeURIComponent(taskId)}`);
+      const data = await res.json();
+
+      if (!res.ok) {
+        alert(data.detail || data.message || data.error || "퀴즈 생성에 실패했습니다");
+        return;
+      }
+
+      if (data.status === "success") {
+        trackEvent({ event_name: "coach_quiz_generated", meta: { topic: quizTopic } });
+        setQuiz(data.quiz);
+        return;
+      }
+
+      if (data.status !== "processing") {
+        alert(data.message || data.error || "퀴즈 생성에 실패했습니다");
+        return;
+      }
+    }
+
+    alert("퀴즈 생성이 지연되고 있습니다. 잠시 후 다시 시도해주세요.");
+  };
+
   const generateQuiz = async () => {
     setGeneratingQuiz(true);
     setQuiz(null);
@@ -116,12 +146,28 @@ export default function CoachPage() {
         body: JSON.stringify({ topic: quizTopic }),
       });
       const data = await res.json();
-      trackEvent({ event_name: "coach_quiz_generated", meta: { topic: quizTopic } });
-      if (data.status === "success") {
-        setQuiz(data.quiz);
-      } else {
-        alert(data.message || data.error || "퀴즈 생성에 실패했습니다");
+      if (!res.ok) {
+        alert(data.detail || data.message || data.error || "퀴즈 생성에 실패했습니다");
+        return;
       }
+
+      if (data.status === "success") {
+        trackEvent({ event_name: "coach_quiz_generated", meta: { topic: quizTopic } });
+        setQuiz(data.quiz);
+        return;
+      }
+
+      if (data.status === "processing" && data.task_id) {
+        await pollQuizTask(data.task_id);
+        return;
+      }
+
+      if (data.status === "processing") {
+        alert(data.message || "퀴즈를 생성 중입니다. 잠시 후 다시 시도해주세요.");
+        return;
+      }
+
+      alert(data.message || data.error || "퀴즈 생성에 실패했습니다");
     } catch {
       alert("퀴즈 생성에 실패했습니다");
     } finally {
@@ -141,7 +187,19 @@ export default function CoachPage() {
   };
 
   const renderMarkdown = (text: string) => {
-    return text
+    const codeBlocks: string[] = [];
+    let html = text.replace(/```(\w+)?\n([\s\S]*?)```/g, (_, lang: string, code: string) => {
+      const safeCode = code
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;");
+      const block = `<pre class="mt-3 mb-3 overflow-x-auto rounded-lg bg-gray-900 text-gray-100 p-3 text-sm"><code data-lang="${lang || "text"}">${safeCode}</code></pre>`;
+      const token = `@@CODE_BLOCK_${codeBlocks.length}@@`;
+      codeBlocks.push(block);
+      return token;
+    });
+
+    html = html
       .replace(/^### (.+)$/gm, '<h3 class="text-lg font-bold mt-4 mb-2">$1</h3>')
       .replace(/^## (.+)$/gm, '<h2 class="text-xl font-bold mt-5 mb-2">$1</h2>')
       .replace(/^# (.+)$/gm, '<h1 class="text-2xl font-bold mt-6 mb-3">$1</h1>')
@@ -156,6 +214,12 @@ export default function CoachPage() {
       .replace(/<summary>(.+?)<\/summary>/g, '<summary class="cursor-pointer font-medium text-primary-600 dark:text-primary-400">$1</summary>')
       .replace(/\n\n/g, "<br/><br/>")
       .replace(/\n/g, "<br/>");
+
+    for (let i = 0; i < codeBlocks.length; i += 1) {
+      html = html.replace(`@@CODE_BLOCK_${i}@@`, codeBlocks[i]);
+    }
+
+    return html;
   };
 
   if (loading) {

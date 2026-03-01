@@ -26,22 +26,23 @@ def build_weekly_summary(user_id: str, week_start_date: str, generate_report: bo
         week_end = week_start + timedelta(days=6)
         
         # Query data for the week
+        # Compare by calendar date to include the full Monday~Sunday window.
         commits = db.query(Commit).filter(
             Commit.user_id == user.id,
-            Commit.committed_at >= week_start,
-            Commit.committed_at <= week_end
+            func.date(Commit.committed_at) >= week_start,
+            func.date(Commit.committed_at) <= week_end
         ).all()
         
         problems = db.query(Problem).filter(
             Problem.user_id == user.id,
-            Problem.solved_at >= week_start,
-            Problem.solved_at <= week_end
+            func.date(Problem.solved_at) >= week_start,
+            func.date(Problem.solved_at) <= week_end
         ).all()
         
         notes = db.query(Note).filter(
             Note.user_id == user.id,
-            Note.created_at >= week_start,
-            Note.created_at <= week_end
+            func.date(Note.created_at) >= week_start,
+            func.date(Note.created_at) <= week_end
         ).all()
         
         # Build aggregation

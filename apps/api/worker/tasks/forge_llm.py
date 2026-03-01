@@ -422,6 +422,10 @@ def generate_coach_analysis(user_id: str):
 @celery_app.task
 def generate_coach_quiz(user_id: str, topic: str = ""):
     """Generate a coding quiz targeting weak areas."""
+    # Keep function signature stable for existing Celery routing.
+    # Improved implementation is delegated to _generate_coach_quiz_v2.
+    return _generate_coach_quiz_v2(user_id, topic)
+
     db = SessionLocal()
     try:
         from app.models.problem import Problem
@@ -481,6 +485,405 @@ def generate_coach_quiz(user_id: str, topic: str = ""):
         return {"error": str(e)}
     finally:
         db.close()
+
+
+def _generate_coach_quiz_v2(user_id: str, topic: str = ""):
+    """Improved quiz generation with concrete-answer quality checks."""
+    db = SessionLocal()
+    try:
+        from app.models.problem import Problem
+        from merge_core.llm import generate_text
+
+        problems = db.query(Problem).filter(Problem.user_id == user_id).all()
+        if not problems:
+            return {"error": "No solved problems found"}
+
+        by_tag = {}
+        by_level = {}
+        for p in problems:
+            if p.level is not None:
+                by_level[p.level] = by_level.get(p.level, 0) + 1
+            for tag in (p.tags or []):
+                by_tag[tag] = by_tag.get(tag, 0) + 1
+
+        tags_desc = sorted(by_tag.items(), key=lambda x: x[1], reverse=True)
+        tags_asc = sorted(by_tag.items(), key=lambda x: x[1])
+
+        weak_areas = [t for t, c in tags_asc if c <= 2][:6]
+        if not weak_areas:
+            weak_areas = [t for t, _ in tags_asc[:4]]
+        strong_areas = [t for t, _ in tags_desc[:6]]
+
+        recent = sorted(
+            problems,
+            key=lambda x: x.solved_at or x.created_at,
+            reverse=True,
+        )[:20]
+        recent_titles = [f"{p.problem_id}:{p.title}" for p in recent if p.title][:8]
+
+        level_values = [p.level for p in problems if p.level is not None]
+        min_level = min(level_values) if level_values else 0
+        max_level = max(level_values) if level_values else 0
+        avg_level = round(sum(level_values) / len(level_values), 2) if level_values else 0.0
+
+        target = (topic or "").strip()
+        if not target:
+            target = ", ".join(weak_areas[:3]) if weak_areas else "core algorithm practice"
+
+        api_key, model = _get_user_llm_key(db, user_id)
+
+        system_prompt = """You are a senior algorithm interview coach.
+Create a practical, personalized coding quiz.
+
+Output requirements:
+- Language: Korean
+- Format: Markdown
+- Number of problems: exactly 5
+- Difficulty progression: easy -> medium -> medium+ -> hard -> hard+
+- At least 2 problems must directly target weak areas from user data.
+- Include 1 debugging/fix question and 1 design/tradeoff question.
+
+Use this exact section shape for each problem:
+## Quiz N - <focus> (<difficulty>)
+### Problem
+### Input/Output
+### Constraints
+### Hint
+<details>
+<summary>정답/해설 보기</summary>
+
+### Final Answer
+- State the exact algorithm/final decision.
+- Include key formula/state transition explicitly.
+
+### Example Walkthrough
+- Provide one concrete sample input and exact output.
+- Explain key steps using real values.
+
+### Reference Code (Python)
+```python
+# complete runnable reference
+```
+
+### Complexity
+- Time:
+- Space:
+### Common Mistakes
+### Similar Practice
+- BOJ:
+- Programmers:
+</details>
+
+Non-negotiable quality rules:
+- Never output vague advice only ("...하면 됩니다").
+- Every problem must include Final Answer + Example Walkthrough + Reference Code.
+- Debugging question must explain exact bug and fixed code.
+- Design question must choose one recommendation and justify alternatives briefly."""
+
+        user_prompt = f"""Target topic: {target}
+
+User profile summary:
+- total solved problems: {len(problems)}
+- level range: {min_level} ~ {max_level}
+- average level: {avg_level}
+- weak areas: {weak_areas or '(insufficient tag data)'}
+- strong areas: {strong_areas or '(insufficient tag data)'}
+- top tag counts: {dict(tags_desc[:12])}
+- level distribution: {dict(sorted(by_level.items()))}
+- recent solved examples: {recent_titles or '(none)'}
+
+Generate a quiz that is challenging but solvable for this profile.
+Do not repeat the same pattern across all five questions.
+Make sure every answer includes concrete output and runnable reference code."""
+
+        try:
+            quiz = generate_text(
+                system_prompt,
+                user_prompt,
+                model=model,
+                api_key=api_key,
+                temperature=0.35,
+                max_tokens=2600,
+            )
+            missing = _quiz_missing_requirements(quiz)
+            if missing:
+                repair_prompt = f"""The draft quiz below failed quality checks.
+
+Missing requirements: {", ".join(missing)}
+
+Rewrite the entire quiz from scratch and satisfy all requirements.
+Keep exactly 5 quizzes.
+
+Draft:
+{quiz}
+"""
+                quiz = generate_text(
+                    system_prompt,
+                    repair_prompt,
+                    model=model,
+                    api_key=api_key,
+                    temperature=0.2,
+                    max_tokens=3000,
+                )
+                missing_after_retry = _quiz_missing_requirements(quiz)
+                if missing_after_retry:
+                    raise ValueError(
+                        "Quiz quality validation failed after retry: "
+                        + ", ".join(missing_after_retry)
+                    )
+            used_fallback = False
+        except Exception:
+            quiz = _build_quiz_fallback(target, weak_areas, strong_areas)
+            used_fallback = True
+
+        content = GeneratedContent(
+            user_id=user_id,
+            content_type="coach_quiz",
+            title=f"Coding Quiz - {target}",
+            content=quiz,
+            status="completed",
+            content_metadata={
+                "topic": target,
+                "total_problems": len(problems),
+                "weak_areas": weak_areas,
+                "strong_areas": strong_areas,
+                "avg_level": avg_level,
+                "fallback_used": used_fallback,
+            },
+        )
+        db.add(content)
+        db.commit()
+
+        return {"status": "success", "content_id": str(content.id), "quiz": quiz}
+    except Exception as e:
+        return {"error": str(e)}
+    finally:
+        db.close()
+
+
+def _quiz_missing_requirements(quiz_text: str) -> list[str]:
+    """Return missing required sections for coach quiz output."""
+    text = quiz_text or ""
+    lower = text.lower()
+    missing: list[str] = []
+
+    quiz_headers = sum(1 for i in range(1, 6) if f"## quiz {i}" in lower)
+    if quiz_headers < 5:
+        missing.append("5 quiz headers")
+
+    if lower.count("### final answer") < 5:
+        missing.append("Final Answer x5")
+
+    if lower.count("### example walkthrough") < 5:
+        missing.append("Example Walkthrough x5")
+
+    if lower.count("### reference code") < 5:
+        missing.append("Reference Code x5")
+
+    if text.count("```") < 10:
+        missing.append("Python code block x5")
+
+    return missing
+
+
+def _build_quiz_fallback(target: str, weak_areas: list[str], strong_areas: list[str]) -> str:
+    """Deterministic fallback quiz when LLM generation is unavailable."""
+    weak_text = ", ".join(weak_areas[:3]) if weak_areas else "core fundamentals"
+    strong_text = ", ".join(strong_areas[:3]) if strong_areas else "implementation"
+    return f"""## Quiz 1 - Prefix Sum (Easy)
+### Problem
+Given array A and range queries [l, r], output the sum for each query.
+### Input/Output
+- Input: N, Q, array, Q queries
+- Output: query sums
+### Constraints
+- 1 <= N, Q <= 200000
+### Hint
+Use prefix sums.
+<details>
+<summary>정답/해설 보기</summary>
+
+### Final Answer
+- Build `prefix[i] = prefix[i-1] + A[i]`.
+- Query answer: `prefix[r] - prefix[l-1]`.
+
+### Example Walkthrough
+- A=[2,-1,4,3], query=(2,4) -> output 6
+
+### Reference Code (Python)
+```python
+prefix = [0]
+for x in arr:
+    prefix.append(prefix[-1] + x)
+ans = prefix[r] - prefix[l - 1]
+```
+
+### Complexity
+- Time: O(N + Q)
+- Space: O(N)
+### Common Mistakes
+- Off-by-one indexing.
+### Similar Practice
+- BOJ: 11659
+- Programmers: Prefix Sum
+</details>
+
+## Quiz 2 - BFS Distance (Medium)
+### Problem
+Find shortest edge distance from start node in an unweighted graph.
+### Input/Output
+- Input: N, M, edges, start
+- Output: distances
+### Constraints
+- 1 <= N <= 100000
+### Hint
+Run one BFS.
+<details>
+<summary>정답/해설 보기</summary>
+
+### Final Answer
+- First visit depth in BFS equals shortest distance.
+
+### Example Walkthrough
+- 1-2,1-3,3-4,start=1 -> [0,1,1,2]
+
+### Reference Code (Python)
+```python
+from collections import deque
+dist = [-1] * (n + 1)
+dist[s] = 0
+dq = deque([s])
+while dq:
+    cur = dq.popleft()
+    for nxt in adj[cur]:
+        if dist[nxt] == -1:
+            dist[nxt] = dist[cur] + 1
+            dq.append(nxt)
+```
+
+### Complexity
+- Time: O(N + M)
+- Space: O(N + M)
+### Common Mistakes
+- Marking visited too late.
+### Similar Practice
+- BOJ: 18352
+- Programmers: Furthest Node
+</details>
+
+## Quiz 3 - DP Focus ({weak_text}) (Medium+)
+### Problem
+Maximize sum of chosen elements with no adjacent picks.
+### Input/Output
+- Input: N, array
+- Output: maximum sum
+### Constraints
+- 1 <= N <= 200000
+### Hint
+Define `dp[i]`.
+<details>
+<summary>정답/해설 보기</summary>
+
+### Final Answer
+- `dp[i] = max(dp[i-1], dp[i-2] + A[i])`.
+
+### Example Walkthrough
+- A=[4,2,7,1] -> output 11
+
+### Reference Code (Python)
+```python
+dp = [0] * (n + 1)
+dp[1] = max(0, a[1])
+for i in range(2, n + 1):
+    dp[i] = max(dp[i - 1], dp[i - 2] + a[i])
+```
+
+### Complexity
+- Time: O(N)
+- Space: O(N)
+### Common Mistakes
+- Incorrect base cases.
+### Similar Practice
+- BOJ: 2579
+- Programmers: Dynamic Programming
+</details>
+
+## Quiz 4 - Debugging Dijkstra (Hard)
+### Problem
+Fix bug in Dijkstra where stale heap entries are processed.
+### Input/Output
+- Input: weighted graph
+- Output: shortest distances
+### Constraints
+- non-negative weights
+### Hint
+Check popped pair against current dist.
+<details>
+<summary>정답/해설 보기</summary>
+
+### Final Answer
+- Add: `if cur_d != dist[cur]: continue`.
+
+### Example Walkthrough
+- 1->2(10),1->3(1),3->2(1),start=1 -> dist[2]=2
+
+### Reference Code (Python)
+```python
+cur_d, cur = heapq.heappop(pq)
+if cur_d != dist[cur]:
+    continue
+```
+
+### Complexity
+- Time: O((N + M) log N)
+- Space: O(N + M)
+### Common Mistakes
+- Early visited freeze.
+### Similar Practice
+- BOJ: 1753
+- Programmers: Delivery
+</details>
+
+## Quiz 5 - System Design Tradeoff ({strong_text}) (Hard+)
+### Problem
+Choose between real-time compute and cache precompute for read-heavy traffic.
+### Input/Output
+- Input: QPS, update interval, SLA
+- Output: recommended strategy
+### Constraints
+- Balance latency/cost/freshness
+### Hint
+Estimate p95 for each strategy.
+<details>
+<summary>정답/해설 보기</summary>
+
+### Final Answer
+- Recommend precompute cache + TTL + invalidation.
+
+### Example Walkthrough
+- QPS=1200, cache hit=90% -> cached p95 is lower than realtime.
+
+### Reference Code (Python)
+```python
+def choose_strategy(qps, compute_ms, cache_hit, sla_ms):
+    cached_p95 = (compute_ms * (1 - cache_hit)) + 20
+    return "precompute_cache_with_invalidation" if cached_p95 <= sla_ms else "realtime_compute"
+```
+
+### Complexity
+- Time: analysis task
+- Space: analysis task
+### Common Mistakes
+- Ignoring invalidation cost.
+### Similar Practice
+- BOJ: N/A
+- Programmers: N/A
+</details>
+
+---
+Fallback quiz generated.
+Target topic: {target}
+"""
 
 
 @celery_app.task

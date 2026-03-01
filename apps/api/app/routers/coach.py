@@ -96,10 +96,16 @@ async def generate_quiz(
     db: Session = Depends(get_db),
 ):
     """Generate a coding quiz targeting weak areas."""
+    total = db.query(func.count(Problem.id)).filter(Problem.user_id == current_user.id).scalar() or 0
+    if total == 0:
+        raise HTTPException(400, "Solved.ac problems are not synced yet. Sync solved.ac first.")
+
     from worker.tasks.forge_llm import generate_coach_quiz
     task = generate_coach_quiz.delay(str(current_user.id), request.topic or "")
 
-    max_wait = 30
+    # Keep initial request short to avoid client/proxy timeout.
+    # If task is not ready, client will poll by task_id.
+    max_wait = 20
     start = time.time()
     while time.time() - start < max_wait:
         if task.ready():
@@ -110,10 +116,46 @@ async def generate_quiz(
                     "quiz": result.get("quiz"),
                     "content_id": result.get("content_id"),
                 }
-            raise HTTPException(500, result.get("error", "Quiz generation failed"))
+            err = result.get("error", "Quiz generation failed")
+            if "No solved problems found" in err:
+                raise HTTPException(400, err)
+            raise HTTPException(500, err)
         time.sleep(0.5)
 
-    return {"status": "processing", "message": "퀴즈를 생성 중입니다."}
+    return {"status": "processing", "message": "Quiz is being generated.", "task_id": task.id}
+
+
+@router.get("/quiz/task/{task_id}")
+async def get_quiz_task_status(
+    task_id: str,
+    current_user: User = Depends(get_current_user),
+):
+    """Poll quiz task status and return result when ready."""
+    from celery.result import AsyncResult
+    from worker.celery_app import celery_app
+
+    task = AsyncResult(task_id, app=celery_app)
+
+    if task.state in ("PENDING", "RECEIVED", "STARTED", "RETRY"):
+        return {"status": "processing", "state": task.state}
+
+    if task.state == "FAILURE":
+        raise HTTPException(500, f"Quiz generation failed: {task.result}")
+
+    result = task.result
+    if isinstance(result, dict):
+        if result.get("status") == "success":
+            return {
+                "status": "success",
+                "quiz": result.get("quiz"),
+                "content_id": result.get("content_id"),
+            }
+        err = result.get("error", "Quiz generation failed")
+        if "No solved problems found" in err:
+            raise HTTPException(400, err)
+        raise HTTPException(500, err)
+
+    raise HTTPException(500, "Unexpected quiz task result")
 
 
 @router.get("/history")
