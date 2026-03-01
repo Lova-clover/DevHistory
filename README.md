@@ -1,4 +1,4 @@
-# DevHistory – Dev Activity Auto-Portfolio
+# DevHistory - Dev Activity Auto-Portfolio
 
 ![DevHistory 홈페이지](./images/homepage.png)
 
@@ -14,7 +14,7 @@ DevHistory의 목표는 단순히 "글을 대신 써주는 AI"가 아니라,
 > **주간/월간 히스토리, 블로그 글, 포트폴리오 섹션, 이력서 문장으로 쉽게 뽑아내게 해주는 것**입니다.
 
 즉, "ChatGPT에 URL 던져서 요약하는 도구"가 아니라,  
-**개발자의 활동 데이터를 장기적으로 기록·분석하고,  
+**개발자의 활동 데이터를 장기적으로 기록/분석하고,  
 그 위에 포트폴리오/블로그/리포트를 올릴 수 있는 개인 개발 라이프 로그 플랫폼**을 지향합니다.
 
 ---
@@ -25,7 +25,7 @@ DevHistory는 네 가지 핵심 개념으로 구성됩니다.
 
 ### 1. 자동 수집 (MergeCollector)
 
-- **GitHub OAuth, solved.ac 핸들, 블로그/노트 연동**을 해두면 커밋/레포, 푼 문제, 작성 글/노트를 주기적으로 자동 수집해서 DB에 쌓습니다.
+- **GitHub OAuth, solved.ac 핸들, 블로그 연동**을 해두면 커밋/레포, 푼 문제, 작성 글을 주기적으로 자동 수집해서 DB에 쌓습니다.
 - 수집 대상:
   - **GitHub**: 레포지토리, 커밋 내역
   - **solved.ac**: 푼 문제, 난이도, 태그/유형
@@ -39,7 +39,7 @@ DevHistory는 네 가지 핵심 개념으로 구성됩니다.
 - "이번 주 / 이번 달에 내가 뭘 했는지"를 커밋 수, 푼 문제 수, 태그/유형 비율, 레포별 기여도 같은 형태로 집계합니다.
 - 이 데이터를 기반으로:
   - 주간/월간 타임라인
-  - 간단한 지표/그래프 (예: 날짜별 활동량, 문제 유형 분포, 레포별 활동량)
+  - 지표/그래프 (예: 날짜별 활동량, 문제 유형 분포, 레포별 활동량)
 
 **결과:** "열심히 한 것 같은데 뭐 했는지 기억 안 나는 상태"에서 벗어나, 실제 활동이 시간축과 지표로 보이게 됩니다.
 
@@ -56,10 +56,10 @@ DevHistory는 네 가지 핵심 개념으로 구성됩니다.
 ### 4. 일관된 스타일/템플릿 (MergeStyler)
 
 - 사용자별로 **언어, 말투, 섹션 구조**를 스타일 프로필로 저장합니다.
-  - 예: `Intro → Problem → Approach → Result → Next`
-- 이 스타일을 모든 자동 생성 글에 적용합니다.
+  - 예: `Intro -> Problem -> Approach -> Result -> Next`
+- 이 스타일을 자동 생성 글에 적용합니다.
 
-**결과:** 포트폴리오·블로그·리포트가 전부 **같은 톤과 구조로 쌓이게** 되어, 나중에 봐도 일관된 "나만의 스타일"이 유지됩니다.
+**결과:** 포트폴리오/블로그/리포트가 전부 **같은 톤과 구조로 쌓이게** 되어, 나중에 봐도 일관된 "나만의 스타일"이 유지됩니다.
 
 ---
 
@@ -68,80 +68,90 @@ DevHistory는 네 가지 핵심 개념으로 구성됩니다.
 DevHistory의 전체 동작 흐름은 다음과 같습니다.
 
 ### 1. 계정 연동 & 스타일 설정
+
 - GitHub OAuth로 로그인
 - solved.ac 핸들, 블로그 ID(예: Velog) 등록
 - 언어/톤/섹션 구조 등 개인 스타일 프로필 설정
 
 ### 2. 활동 자동 수집 (MergeCollector)
-- 주기적으로 GitHub/solved.ac/블로그/노트에서 활동 로그를 가져와 DB에 누적
+
+- 주기적으로 GitHub/solved.ac/블로그에서 활동 로그를 가져와 DB에 누적
 - 새로운 레포, 커밋, 문제 풀이, 글 작성이 있으면 계속 쌓임
 
 ### 3. 주간/월간 집계 & 히스토리 생성 (MergeTimeline)
+
 - 일정 주기마다 최근 1주/1달 데이터를 집계
 - 커밋 수, 문제 수, 날짜별 활동량, 문제 유형 분포, 레포별 기여도 등을 계산
-- 대시보드와 주간 리포트 리스트에 표시할 수 있는 형태로 정리
+- 대시보드와 리포트 리스트에 표시할 수 있는 형태로 정리
 
 ### 4. 콘텐츠 생성 요청 (MergeForge)
+
 - 사용자가 UI에서 "이 주차 회고 생성", "이 레포 블로그 글 생성" 버튼 클릭
 - MergeForge가:
-  - 해당 기간/레포의 집계 데이터 + 중요 로그들을 모아서
+  - 해당 기간/레포의 집계 데이터 + 중요 로그를 모아서
   - MergeStyler의 스타일 프로필을 system prompt에 적용한 뒤
   - LLM(OpenAI 등)을 호출해 Markdown 초안을 생성
 
 ### 5. 검토 & 재사용
+
 - 생성된 텍스트는:
-  - 주간/월간 회고 페이지에서 바로 확인
-  - 블로그(Velog 등)에 그대로 복붙 또는 약간 편집 후 게시
+  - 리포트/콘텐츠 페이지에서 바로 확인
+  - 블로그(Velog 등)에 복붙 또는 편집 후 게시
   - 포트폴리오/이력서용 섹션으로 재사용
 - 사용자는 **"생산보다 검토/수정에 집중"**할 수 있게 됩니다.
 
-이 파이프라인을 통해, **"데이터 수집 + 누적 + 분석 + 한 방에 아웃풋"**이라는 흐름이 완성됩니다.
+이 파이프라인을 통해, **"데이터 수집 + 누적 + 분석 + 한 방에 아웃풋"** 흐름이 완성됩니다.
 
 ---
 
 ## 📸 스크린샷
 
 ### 대시보드
+
 ![DevHistory 대시보드](https://velog.velcdn.com/images/lova-clover/post/ed67c82b-0c57-4439-b007-0d8f76e077d2/image.png)
 
-*개발 활동 통계와 트렌드를 한눈에*
+_개발 활동 통계와 트렌드를 한눈에_
 
 ### 포트폴리오
+
 ![포트폴리오](https://velog.velcdn.com/images/lova-clover/post/314f698e-b809-4c2b-bf0e-40dff7221200/image.png)
 
-*자동 생성된 포트폴리오 페이지*
+_자동 생성된 포트폴리오 페이지_
 
 ### 생성된 블로그 글
+
 ![생성된 블로그](./images/generated-blog.png)
 
-*LLM이 작성한 기술 블로그*
+_LLM이 작성한 기술 블로그 초안_
 
 ---
 
 ## 📁 프로젝트 구조
 
-```
+```text
 devhistory/
 ├── apps/
 │   ├── api/                  # FastAPI 백엔드
-│   │   ├── app/             # API 서버
-│   │   │   ├── routers/     # REST API 엔드포인트
-│   │   │   └── models/      # 데이터베이스 모델
-│   │   └── worker/          # Celery 백그라운드 작업
+│   │   ├── app/              # API 서버
+│   │   │   ├── routers/      # REST API 엔드포인트
+│   │   │   └── models/       # 데이터베이스 모델
+│   │   └── worker/           # Celery 백그라운드 작업
 │   └── web/                  # Next.js 프론트엔드
-│       └── app/             # App Router 페이지
+│       └── app/              # App Router 페이지
 ├── packages/                 # 공통 Python 패키지
-│   ├── merge_core/          # LLM, 설정 등 핵심 유틸
-│   ├── merge_collector/     # GitHub, solved.ac, Velog 수집
-│   ├── merge_timeline/      # 주간/월간 집계 및 타임라인
-│   ├── merge_forge/         # LLM 콘텐츠 생성 (회고, 블로그)
-│   └── merge_styler/        # 스타일 프로필 관리
+│   ├── merge_core/           # LLM, 설정 등 핵심 유틸
+│   ├── merge_collector/      # GitHub, solved.ac, Velog 수집
+│   ├── merge_timeline/       # 주간/월간 집계 및 타임라인
+│   ├── merge_forge/          # LLM 콘텐츠 생성 (회고, 블로그)
+│   └── merge_styler/         # 스타일 프로필 관리
 ├── infra/
-│   ├── docker-compose.yml   # Docker 서비스 정의
-│   └── migrations/          # Alembic DB 마이그레이션
+│   ├── docker-compose.yml
+│   ├── docker-compose.prod.yml
+│   └── migrations/           # Alembic DB 마이그레이션
 └── docs/
-    ├── ARCHITECTURE.md      # 시스템 아키텍처
-    └── API_SPEC.md          # API 명세
+    ├── ARCHITECTURE.md
+    ├── API_SPEC.md
+    └── DEPLOYMENT.md
 ```
 
 ---
@@ -149,62 +159,65 @@ devhistory/
 ## 🛠 기술 스택
 
 ### Frontend
+
 - **Next.js 14** (App Router) + TypeScript
 - **Tailwind CSS** - 스타일링
-- **React Hooks** - 상태 관리
+- **Framer Motion** - 인터랙션/애니메이션
 
 ### Backend
+
 - **FastAPI** - 웹 프레임워크
 - **SQLAlchemy** + **Alembic** - ORM 및 마이그레이션
 - **PostgreSQL** - 관계형 데이터베이스
 - **Celery** + **Redis** - 비동기 작업 큐 & 스케줄링
 
 ### Authentication & External APIs
-- **GitHub OAuth** - 로그인 및 본인 소유 레포지토리 접근 (affiliation=owner)
+
+- **GitHub OAuth** - 로그인 및 본인 소유 레포지토리 접근 (`affiliation=owner`)
 - **solved.ac API** - 문제 풀이 데이터
 - **Velog RSS** - 블로그 포스트 수집
 - **OpenAI API** - LLM 콘텐츠 생성
 
 ### Infrastructure
+
 - **Docker Compose** - 멀티 컨테이너 오케스트레이션
-- **JWT** - 인증 토큰
+- **Caddy** - 프로덕션 HTTPS 리버스 프록시
+- **JWT + httpOnly Cookie** - 인증 세션
 
 ---
 
 ## 🚀 빠른 시작
 
 ### 사전 요구사항
-- Docker & Docker Compose
+
+- Docker Desktop (Compose v2)
 - GitHub 계정 (OAuth 앱 생성용)
-- OpenAI API Key
+- Python 3.11+ (최초 마이그레이션 실행용)
+- OpenAI API Key (선택)
+  - 서버 공용 키를 쓰지 않으면 사용자 BYO Key 방식으로 사용 가능
 
 ### 1단계: 환경 변수 설정
 
 ```powershell
-# .env.example을 .env로 복사
 Copy-Item .env.example .env
 ```
 
-`.env` 파일을 열어 다음 값들을 설정하세요:
+`.env` 파일에서 최소 다음 값을 설정하세요:
 
 ```env
-# GitHub OAuth (필수)
 GITHUB_CLIENT_ID=your-github-client-id
 GITHUB_CLIENT_SECRET=your-github-client-secret
-
-# OpenAI (필수 - LLM 콘텐츠 생성용)
-OPENAI_API_KEY=your-openai-api-key
-
-# JWT Secret (랜덤 문자열로 변경 권장)
 JWT_SECRET=your-secret-key-change-this
+GITHUB_REDIRECT_URI=http://localhost:8000/api/auth/github/callback
 
-# 나머지는 기본값 사용 가능
+# 선택 (서버 공용 LLM 키)
+OPENAI_API_KEY=your-openai-api-key
 ```
 
 ### 2단계: GitHub OAuth 앱 생성
 
 1. https://github.com/settings/developers 접속
-2. **"New OAuth App"** 클릭
+2. **New OAuth App** 클릭
 3. 다음 정보 입력:
    - **Application name**: `DevHistory (Dev)`
    - **Homepage URL**: `http://localhost:3000`
@@ -214,17 +227,20 @@ JWT_SECRET=your-secret-key-change-this
 ### 3단계: Docker로 실행
 
 ```powershell
-cd infra
-docker-compose up -d
+docker compose -f infra/docker-compose.yml up -d --build
 ```
 
-### 4단계: 데이터베이스 초기화
+### 4단계: 데이터베이스 초기화 (최초 1회)
 
 ```powershell
-docker exec -it devhistory_api alembic upgrade head
+python -m venv .venv
+.\.venv\Scripts\activate
+pip install -e .
+$env:PYTHONPATH="$PWD\apps\api;$PWD\packages"
+alembic -c infra/alembic.ini upgrade head
 ```
 
-### 5단계: 접속!
+### 5단계: 접속
 
 - **Frontend**: http://localhost:3000
 - **Backend API**: http://localhost:8000
@@ -239,62 +255,88 @@ docker exec -it devhistory_api alembic upgrade head
 ## 💡 연동 가능한 서비스
 
 ### ✅ 현재 지원
-- **GitHub** - OAuth 인증을 통한 전체 레포지토리 및 커밋 접근
-- **solved.ac** - 핸들(사용자명) 기반 공개 API 접근
+
+- **GitHub** - OAuth 인증을 통한 레포지토리/커밋 접근
+- **solved.ac** - 핸들 기반 공개 API 접근
 - **Velog** - RSS 피드를 통한 블로그 포스트 메타데이터 수집
 
 ### 🔜 향후 지원 예정
-- **Notion** - 노트/문서 연동
-- **Baekjun Online Judge** - 직접 연동
-- **Tistory, Medium** - 추가 블로그 플랫폼
 
-**참고**: 
-- solved.ac와 Velog는 공개 API/RSS를 사용하므로 별도 인증 없이 핸들/ID만 있으면 수집 가능합니다.
-- GitHub은 OAuth 인증을 통해 private 레포지토리도 접근 가능합니다 (권한 설정에 따라).
+- **Notion** - 노트/문서 연동
+- **추가 블로그 플랫폼** - Tistory, Medium 등
+
+**참고**
+
+- solved.ac/Velog는 공개 API/RSS 기반이라 핸들/ID로 수집 가능합니다.
+- GitHub은 OAuth 권한 범위에 따라 private 레포 접근 여부가 달라집니다.
 
 ---
 
 ## 📝 주요 기능
 
 ### 대시보드
+
 - 전체/주간 활동 요약 (총 커밋, 레포지토리, 문제 풀이, 블로그 글)
-- 주간 증감 트렌드 (절대값 차이로 표시)
+- 주간 증감 트렌드 (절대값 차이 기반 표시)
 - 커밋 트렌드 그래프 및 언어 분포 차트
 - 빠른 실행 버튼 (GitHub/Velog/Solved.ac 동기화)
 
 ### 주간 리포트
+
 - 자동 집계된 주간 활동 통계
 - AI 생성 회고 글 (Markdown)
-- Velog 스타일 매칭 (반말, 친근한 톤)
-- 블로그에 바로 복사 가능
+- 스타일 프로필 기반 결과물 생성
+- 복사/재사용 가능한 결과 포맷
 
 ### 레포지토리 관리
-- 본인 소유 레포만 자동 동기화 (contributor 레포 제외)
-- GitHub 실제 생성 날짜 보존
-- 레포별 상세 정보 및 최근 커밋
-- 프로젝트 블로그 글 자동 생성 (README 3000자 + 커밋 요약)
 
-### 생성된 콘텐츠 관리
-- 생성된 블로그 글 목록 조회
-- 수정/삭제 기능
+- 본인 소유 레포 자동 동기화 (`owner` 기준)
+- GitHub 실제 생성/수정 시각 보존
+- 레포별 상세 정보 및 최근 커밋 조회
+- 레포 기반 블로그 글 자동 생성
+
+### 코딩 코치
+
+- solved.ac 기반 풀이 패턴 분석
+- 코딩 퀴즈 생성
+- 비동기 생성 상태 폴링으로 "대기 후 실패처럼 보이는 문제" 완화
+- 코칭 히스토리 조회
+
+### 생성 콘텐츠 관리
+
+- 생성된 블로그/리포트 목록 조회
+- 수정/삭제/재생성
 - Markdown 렌더링 프리뷰
 
 ### 포트폴리오
+
 - 자동 집계된 활동 통계
-- 커밋 수 기반 상위 프로젝트 하이라이트
-- 레포지토리 개수 기반 언어 분포
-- **PDF 내보내기** (개요/프로젝트/스킬 탭 포함)
-- 다크모드 완벽 지원
-- 포트폴리오 설정 (이름, 이메일, 소개, 표시 레포 개수)
+- 상위 프로젝트/기술 스택 시각화
+- **공개 포트폴리오 URL(slug)** + **비공개 공유 링크(token)**
+- 공유 토큰 재발급 및 이메일 공개 여부 제어
+- **PDF 내보내기 (캡처 방식)**
+  - `html2canvas + jsPDF`
+  - 캡처 전 폰트/이미지 렌더 대기 처리(이모지 누락 완화)
+
+### 이력서/자기소개서
+
+- 포트폴리오 데이터 기반 생성
+- Markdown 복사/다운로드
+- 생성 히스토리 조회
+
+### 관리자 기능
+
+- PV/UV, DAU/MAU, 상위 페이지 조회
+- 특정 GitHub 사용자만 관리자 접근 허용
 
 ---
 
 ## 🎯 Project Purpose
 
-원래는 제가 제 GitHub/solved.ac/블로그/노트 활동을 자동으로 기록·정리하려고 만든 **개인용 서비스**입니다.
+원래는 제가 제 GitHub/solved.ac/블로그 활동을 자동으로 기록/정리하려고 만든 **개인용 서비스**입니다.
 
-- 과제, 대회, 개인 프로젝트, 알고리즘 풀이를 하다 보면 "내가 뭘 얼마나 했는지" 정리하기가 너무 귀찮고,
-- 포트폴리오/블로그를 쓰려면 다시 로그를 모으고, 회고를 쓰고, 구조를 잡는 과정이 번거롭습니다.
+- 과제, 대회, 개인 프로젝트, 알고리즘 풀이를 하다 보면 "내가 뭘 얼마나 했는지" 정리하기가 번거롭고,
+- 포트폴리오/블로그를 쓰려면 다시 로그를 모으고, 회고를 쓰고, 구조를 잡는 과정이 반복됩니다.
 
 그래서,
 
@@ -303,50 +345,45 @@ docker exec -it devhistory_api alembic upgrade head
 
 는 목적을 가지고 DevHistory를 만들었습니다.
 
-다만, 구조와 설계는 처음부터 **다중 사용자와 상용 서비스**를 고려해서 설계했습니다.  
-(계정 연동, 배치 작업, DB 스키마, LLM 통합 등)
+구조와 설계는 처음부터 **다중 사용자와 실제 운영**을 고려했습니다.  
+(계정 연동, 배치 작업, DB 스키마, LLM 통합, 보안 설정)
 
 ---
 
 ## 📊 Current Status
 
-**✅ 모든 핵심 기능 완성** (2025.11.30)
+**✅ 핵심 기능 운영 가능 상태 (2026.03 기준)**
 
-- **자동 수집**: GitHub (본인 소유 레포만), Velog, Solved.ac ✅
-- **대시보드**: 통계, 트렌드, 차트 (증감 표시 정확도 개선) ✅
-- **포트폴리오**: PDF 내보내기, 다크모드, 커스터마이징 ✅
-- **LLM 생성**: Velog 스타일 매칭 블로그 글, 주간 리포트 ✅
-- **콘텐츠 관리**: 수정/삭제, 프리뷰 ✅
+- **자동 수집**: GitHub / Velog / solved.ac
+- **대시보드**: 통계, 트렌드, 차트
+- **코칭**: 분석 + 퀴즈 생성(비동기 폴링 포함)
+- **포트폴리오**: 공유 링크 + PDF 내보내기
+- **LLM 생성**: 주간 리포트, 레포 기반 콘텐츠
+- **콘텐츠 관리**: 수정/삭제/재생성/프리뷰
+- **BYO LLM 키 관리**: 저장/검증/테스트/삭제
+- **로그인 흐름 개선**: OAuth 로그인 직후 GitHub sync 자동 큐잉
 
-- LLM 호출 비용 이슈 때문에, 현재는 **퍼블릭 SaaS 형태로 운영하고 있지는 않습니다.**
-- 대신:
-  - 로컬 환경에서 Docker로 쉽게 올릴 수 있고,
-  - 사용자가 자신의 OpenAI API Key를 넣어 직접 실행하는 형태로 설계했습니다.
-- 개인적으로는:
-  - 제 개발/공부 활동을 DevHistory로 수집/정리하면서,
-  - 실제 회고/블로그/포폴을 뽑아보는 용도로 사용합니다.
+현재는 비용/운영 정책상 퍼블릭 SaaS로 완전 공개 운영 중은 아니며,  
+로컬/개인 배포 또는 소규모 운영 전제로 사용하고 있습니다.
 
 ---
 
 ## ✨ Highlights
 
-이 프로젝트는 단순한 "개인 취미용 스크립트"가 아니라,
+이 프로젝트는 단순한 개인 스크립트가 아니라, 아래를 한 번에 다루는 풀스택 프로젝트입니다.
 
-- **OAuth(GitHub 연동)** - 본인 소유 레포만 정확히 필터링
-- **백엔드 API 서버** (FastAPI) - 비동기 처리 최적화
-- **주기적인 배치 작업** (Celery) - 활동 수집/집계/주간 리포트
-- **관계형 DB 스키마 설계** (PostgreSQL + Alembic)
-- **LLM 통합** (OpenAI) - 사용자 Velog 스타일 학습 및 매칭
-- **포트폴리오 PDF 내보내기** - html2canvas + jsPDF
-- **완전한 다크모드 지원**
-
-까지 포함한, **상용 서비스 기준으로 설계·구현한 풀스택 + AI 프로젝트**입니다.
+- OAuth 기반 인증/권한 흐름
+- FastAPI + Celery + Redis 비동기 파이프라인
+- PostgreSQL + Alembic 스키마 마이그레이션
+- 활동 데이터 수집/집계/생성까지 이어지는 end-to-end 흐름
+- 사용자별 LLM 키(BYO) 암호화 저장 및 검증
+- 포트폴리오 공유/배포를 고려한 공개 URL 설계
 
 목표는:
 
 > "개발자 인생을 대신 살아주는 도구"가 아니라,  
-> **이미 살아온 개발 인생을 데이터로 잘 정리해서,  
-> 포트폴리오와 기록으로 재사용하기 쉽게 만들어 주는 도구**
+> **이미 쌓인 개발 활동을 데이터로 정리해서  
+> 포트폴리오와 기록으로 재사용하기 쉽게 만드는 도구**
 
 입니다.
 
@@ -354,10 +391,12 @@ docker exec -it devhistory_api alembic upgrade head
 
 ## 📚 문서
 
-- [시작 가이드](GETTING_STARTED.md) - 상세한 설치 및 실행 방법
-- [프로젝트 요약](PROJECT_SUMMARY.md) - 전체 구조 한눈에 보기
-- [아키텍처](docs/ARCHITECTURE.md) - 시스템 설계 및 모듈 구조
-- [API 명세](docs/API_SPEC.md) - REST API 엔드포인트 상세
+- [시작 가이드](GETTING_STARTED.md)
+- [아키텍처](docs/ARCHITECTURE.md)
+- [API 명세](docs/API_SPEC.md)
+- [배포 가이드](docs/DEPLOYMENT.md)
+- [운영 가이드](docs/OPERATIONS.md)
+- [보안 가이드](docs/SECURITY.md)
 
 ---
 
@@ -372,8 +411,10 @@ docker exec -it devhistory_api alembic upgrade head
 ---
 
 ## 📘 More Details
-DevHistory를 어떻게 설계 및 개발했는지, 구현 과정과 회고는 아래 블로그에서 자세히 정리했습니다.
-- [DevHistory – 개발 포트폴리오 자동화 플랫폼 만들기 (Velog)](https://velog.io/@lova-clover/DevHistory-개발-포트폴리오-자동화-플랫폼-만들기)
+
+DevHistory의 설계/개발 과정과 회고는 아래 블로그에서 확인할 수 있습니다.
+
+- [DevHistory - 개발 포트폴리오 자동화 플랫폼 만들기 (Velog)](https://velog.io/@lova-clover/DevHistory-%EA%B0%9C%EB%B0%9C-%ED%8F%AC%ED%8A%B8%ED%8F%B4%EB%A6%AC%EC%98%A4-%EC%9E%90%EB%8F%99%ED%99%94-%ED%94%8C%EB%9E%AB%ED%8F%BC-%EB%A7%8C%EB%93%A4%EA%B8%B0)
 
 ---
 
@@ -383,5 +424,4 @@ MIT License
 
 ---
 
-**DevHistory** - Made with ❤️ for developers who want to turn their daily activities into meaningful portfolios
-
+**DevHistory** - Made with care for developers who want to turn daily activities into meaningful portfolios.
