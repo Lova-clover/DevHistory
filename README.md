@@ -108,7 +108,7 @@ DevHistory의 전체 동작 흐름은 다음과 같습니다.
 
 ### 대시보드
 
-![DevHistory 대시보드](https://velog.velcdn.com/images/lova-clover/post/ed67c82b-0c57-4439-b007-0d8f76e077d2/image.png)
+![DevHistory 대시보드](https://github.com/Lova-clover/DevHistory/blob/main/images/dashboard.png)
 
 _개발 활동 통계와 트렌드를 한눈에_
 
