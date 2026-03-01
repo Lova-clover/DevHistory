@@ -416,6 +416,8 @@ DevHistory의 설계/개발 과정과 회고는 아래 블로그에서 확인할
 
 - [DevHistory - 개발 포트폴리오 자동화 플랫폼 만들기 (Velog)](https://velog.io/@lova-clover/DevHistory-%EA%B0%9C%EB%B0%9C-%ED%8F%AC%ED%8A%B8%ED%8F%B4%EB%A6%AC%EC%98%A4-%EC%9E%90%EB%8F%99%ED%99%94-%ED%94%8C%EB%9E%AB%ED%8F%BC-%EB%A7%8C%EB%93%A4%EA%B8%B0)
 
+- [[DevHistory] 토이에서 서비스로, 배포 직전 트러블슈팅 정리 (Velog)](https://velog.io/@lova-clover/DevHistory-%ED%86%A0%EC%9D%B4%EC%97%90%EC%84%9C-%EC%84%9C%EB%B9%84%EC%8A%A4%EB%A1%9C-%EB%B0%B0%ED%8F%AC-%EC%A7%81%EC%A0%84-%ED%8A%B8%EB%9F%AC%EB%B8%94%EC%8A%88%ED%8C%85-%EC%A0%95%EB%A6%AC)
+
 ---
 
 ## 📄 License
